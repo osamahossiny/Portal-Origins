@@ -24,16 +24,162 @@ using namespace std;
 
 void setupLights();
 void setupCamera();
-void drawPlayer(double x,double y, double z,double rotation);
+void drawPlayer(double x, double y, double z, double rotation);
 void drawWall(double x, double y, double z, double rotation);
 
-class Wall 
+
+//================================================================================================//
+
+int WIDTH = 1920;
+int HEIGHT = 1080;
+
+int preX = 1535/2, preY = 863/2;
+
+GLuint tex;
+char title[] = "3D Model Loader Sample";
+
+// 3D Projection Options
+GLdouble fovy = 45.0;
+GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
+GLdouble zNear = 0.1;
+GLdouble zFar = 100;
+
+
+// Model Variables
+Model_3DS model_house;
+Model_3DS model_tree;
+Model_3DS model_gun;
+
+// Textures
+GLTexture tex_ground;
+GLTexture wallTex;
+
+
+//================================================================================================//
+
+class Vector
 {
 public:
-	GLdouble x, y, z, r, l, h ,w;
+	GLdouble x, y, z;
+	Vector() {}
+	Vector(GLdouble _x, GLdouble _y, GLdouble _z) : x(_x), y(_y), z(_z) {}
+	//================================================================================================//
+	// Operator Overloading; In C++ you can override the behavior of operators for you class objects. //
+	// Here we are overloading the += operator to add a given value to all vector coordinates.        //
+	//================================================================================================//
+	void operator +=(float value)
+	{
+		x += value;
+		y += value;
+		z += value;
+	}
+	void operator /=(float value)
+	{
+		x /= value;
+		y /= value;
+		z /= value;
+	}
+	void operator -=(Vector v) {
+		x -= v.x;
+		y -= v.y;
+		z -= v.z;
+	}
+	Vector operator -(Vector v) {
+		return Vector(x - v.x, y - v.y, z - v.z);
+	}
+	Vector operator +(Vector v) {
+		return Vector(x + v.x, y + v.y, z + v.z);
+	}
+	void operator +=(Vector v) {
+		x += v.x;
+		y += v.y;
+		z += v.z;
+	}
+	Vector operator*(float value) {
+		return Vector(x * value, y * value, z * value);
+	}
+	Vector operator/(float value) {
+		return Vector(x / value, y / value, z / value);
+	}
+	Vector operator *(Vector v) {//cross multiblication
+		return Vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
+	}
+
+};
+Vector unitVector(Vector b) {
+	Vector unitVector = b / (sqrt(b.x * b.x + b.y * b.y + b.z * b.z));
+	return unitVector;
+}
+int vectorLength(Vector v) {
+	return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+
+class Camera {
+public:
+	Vector Eye, At, Up;
+
+	Camera(float EyeX = 20.0f, float EyeY = 8.0f, float EyeZ = 1.0f, float AtX = 8.0f, float AtY = 0.0f, float AtZ = 0.0f, float UpX = 0.0f, float UpY = 1.0f, float UpZ = 0.0f) {
+		Eye = Vector(EyeX, EyeY, EyeZ);
+		At = Vector(AtX, AtY, AtZ);
+		Up = Vector(UpX, UpY, UpZ);
+	}
+
+	void moveX(float d) {
+		Vector right = unitVector(Up * (At - Eye));
+		right.y = 0;
+		Eye = Eye + right * d;
+		At = At + right * d;
+	}
+
+	void moveY(float d) {
+		//Eye = Eye + unitVector(Up) * d;
+		At = At + unitVector(Up) * d;
+		At.y =  min(At.y, 3);
+
+		cout<<Up.x <<" " << Up.y << " " << Up.z << endl;
+	}
+
+	void moveZ(float d) {
+		Vector view = unitVector(At - Eye);
+		view.y = 0;
+		Eye = Eye + view * d;
+		At = At + view * d;
+	}
+
+	void rotateX(float a) {
+		Vector view = unitVector(At - Eye);
+		Vector right = unitVector(Up * (view));
+		view = view * cos(DEG2RAD(a)) + Up * sin(DEG2RAD(a));
+		Up = view * (right);
+		At = Eye + view;
+	}
+
+	void rotateY(float a) {
+		Vector view = unitVector(At - Eye);
+		Vector right = unitVector(Up * (view));
+		view = view * cos(DEG2RAD(a)) + right * sin(DEG2RAD(a));
+		right = view * (Up);
+		At = Eye + view;
+	}
+
+	void look() {
+		gluLookAt(
+			Eye.x, Eye.y, Eye.z,
+			At.x, At.y, At.z,
+			Up.x, Up.y, Up.z
+		);
+	}
+
+};
+
+class Wall
+{
+public:
+	GLdouble x, y, z, r, l, h, w;
 	GLTexture wallTex;
 
-	Wall(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _r, GLdouble _l, GLdouble _h, GLdouble _w, GLTexture _wallTex) 
+	Wall(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _r, GLdouble _l, GLdouble _h, GLdouble _w, GLTexture _wallTex)
 	{
 		x = _x; // x coord of the center point
 		y = _y; // y coord of the center point
@@ -43,15 +189,15 @@ public:
 		h = _h; // height of the wall
 		w = _w; // width of the wall
 		wallTex = _wallTex;
-		
+
 	}
 	void draw() {
 		glPushMatrix();
-		
+
 		glDisable(GL_LIGHTING);
 
 		glColor3f(1, 1, 1);
-		glTranslated(x, y, z);
+		glTranslated(x, 0, z);
 		glRotated(r, 0, 1, 0);
 
 		glEnable(GL_TEXTURE_2D);
@@ -63,13 +209,13 @@ public:
 		glBegin(GL_QUADS);
 		glNormal3f(0, 0, 1);
 		glTexCoord2f(0, 0);
-		glVertex3f(l/2, 0, - w / 2);
+		glVertex3f(l / 2, 0, -w / 2);
 		glTexCoord2f(1, 0);
-		glVertex3f(l/2, h, - w / 2);
+		glVertex3f(l / 2, h, -w / 2);
 		glTexCoord2f(1, 1);
-		glVertex3f(-l/2, h, - w / 2);
+		glVertex3f(-l / 2, h, -w / 2);
 		glTexCoord2f(0, 1);
-		glVertex3f(-l/2, 0, - w / 2);
+		glVertex3f(-l / 2, 0, -w / 2);
 		glEnd();
 		glPopMatrix();
 
@@ -84,11 +230,11 @@ public:
 		glTexCoord2f(0, 0);
 		glVertex3f(l / 2, 0, w / 2);
 		glTexCoord2f(1, 0);
-		glVertex3f(l/ 2, h, w / 2);
+		glVertex3f(l / 2, h, w / 2);
 		glTexCoord2f(1, 1);
-		glVertex3f(-l/ 2, h, w / 2);
+		glVertex3f(-l / 2, h, w / 2);
 		glTexCoord2f(0, 1);
-		glVertex3f(-l / 2 , 0, w / 2);
+		glVertex3f(-l / 2, 0, w / 2);
 		glEnd();
 		glPopMatrix();
 
@@ -100,9 +246,9 @@ public:
 		glBegin(GL_QUADS);
 		glNormal3f(1, 0, 0);
 		glTexCoord2f(0, 0);
-		glVertex3f(-l/2, 0, w/2);
+		glVertex3f(-l / 2, 0, w / 2);
 		glTexCoord2f(1, 0);
-		glVertex3f(-l / 2, h, w/2);
+		glVertex3f(-l / 2, h, w / 2);
 		glTexCoord2f(1, 1);
 		glVertex3f(-l / 2, h, -w / 2);
 		glTexCoord2f(0, 1);
@@ -142,12 +288,27 @@ class Player
 {
 public:
 	GLdouble x, y, z, r;
+	GLdouble speed = 0.2;
+	Camera camera;
+	bool left = false, right = false, front = false, back = false, isFirstPerson = true, isStable = false;
+	GLdouble yaw = 0;
 	Player(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _r) {
 		x = _x; // x coord of the center point
 		y = _y; // y coord of the center point
 		z = _z;	// z coord of the center point
 		r = _r;	// rotation angle
 	}
+
+	void move(Vector v) { // movement direction
+		Vector u = unitVector(v);
+		r = atan(u.x / u.z);
+		x + u.x * speed;
+		y + u.y * speed;
+		z + u.z * speed;
+		x + u.x * speed;
+
+	}
+
 	void draw() {
 		//legs and center
 		glPushMatrix();
@@ -247,142 +408,126 @@ public:
 		glutSolidCube(1);
 
 		glPopMatrix();
+
+		glPushMatrix();
+		glTranslated(x, 1.5, z);
+		glScaled(.5,.5,.5);
+		model_gun.Draw();
+		glPopMatrix();
+	}
+	void firstPerson() {
+		Vector view = unitVector(camera.At - camera.Eye);
+
+		//x = camera.Eye.x-.4;
+		//z = camera.Eye.z;
+
+		//camera.Eye.x = x + .4;
+		//camera.Eye.z = z;
+		//camera.Eye.y = y;
+
+		camera.Eye = camera.At - Vector(8,0,0);
+		camera.Eye.y = 1.5;
+
+
+
+		/*GLdouble dis = (x - camera.At.x) * (x - camera.At.x) + (y - camera.At.y) * (y - camera.At.y) + (z - camera.At.z) * (z - camera.At.z);
+		if (dis < 10) {
+			camera.At += view * (10 - dis) * view;
+		}
+		else {
+			camera.At -= view * (10 - dis) * view;
+		}*/
+	}
+	void thirdPerson() {
+		camera.Eye.x = x - 2;
+		camera.Eye.z = z;
+		camera.Eye.y = y + 5;
+		//camera.At.x = 1;
+		//camera.At.y = 0;
+		//camera.At.z = 0;
+	}
+
+	void update() {
+		if (left) {
+			//x-=speed;
+			Vector vec = Vector(0,0,0);
+			vec.x = camera.Eye.x;
+			vec.y = camera.Eye.y;
+			vec.z = camera.Eye.z;
+			camera.moveX(speed);
+			vec = camera.Eye - vec;
+			x += vec.x;
+			z += vec.z;
+
+
+		}
+		if (right) {
+			//x += speed;
+			Vector vec = Vector(0, 0, 0);
+			vec.x = camera.Eye.x;
+			vec.y = camera.Eye.y;
+			vec.z = camera.Eye.z;
+			camera.moveX(-speed);
+			x += vec.x;
+			z += vec.z;
+		}
+		if (front) {
+			//z -= speed;
+			Vector vec = Vector(0, 0, 0);
+			vec.x = camera.Eye.x;
+			vec.y = camera.Eye.y;
+			vec.z = camera.Eye.z;
+			camera.moveZ(speed);
+			x += vec.x;
+			z += vec.z;
+		}
+		if (back) {
+			//z += speed;
+			Vector vec = Vector(0, 0, 0);
+			vec.x = camera.Eye.x;
+			vec.y = camera.Eye.y;
+			vec.z = camera.Eye.z;
+			camera.moveZ(-speed);
+			x += vec.x;
+			z += vec.z;
+		}
+		if (!isStable) {
+			if (isFirstPerson) {
+				firstPerson();
+			}
+			else {
+				thirdPerson();
+			}
+			isStable = true;
+		}
+
 	}
 };
 
+Wall wall = Wall(0, 0, 0, 0, 10, 10, 10, wallTex);
+Player player = Player(0, 2.35, 0, 0);
 
-int WIDTH = 1280;
-int HEIGHT = 720;
+void playerUpdate(int x) {
+	player.update();
+	glutTimerFunc(10, playerUpdate, 0);
+}
 
-GLuint tex;
-char title[] = "3D Model Loader Sample";
 
-// 3D Projection Options
-GLdouble fovy = 45.0;
-GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
-GLdouble zNear = 0.1;
-GLdouble zFar = 100;
-class Vector
+
+void LoadAssets()
 {
-public:
-	GLdouble x, y, z;
-	Vector() {}
-	Vector(GLdouble _x, GLdouble _y, GLdouble _z) : x(_x), y(_y), z(_z) {}
-	//================================================================================================//
-	// Operator Overloading; In C++ you can override the behavior of operators for you class objects. //
-	// Here we are overloading the += operator to add a given value to all vector coordinates.        //
-	//================================================================================================//
-	void operator +=(float value)
-	{
-		x += value;
-		y += value;
-		z += value;
-	}
-	void operator /=(float value)
-	{
-		x /= value;
-		y /= value;
-		z /= value;
-	}
-	void operator -=(Vector v) {
-		x -= v.x;
-		y -= v.y;
-		z -= v.z;
-	}
-	Vector operator -(Vector v) {
-		return Vector(x - v.x, y - v.y, z - v.z);
-	}
-	Vector operator +(Vector v) {
-		return Vector(x + v.x, y + v.y, z + v.z);
-	}
-	void operator +=(Vector v) {
-		x += v.x;
-		y += v.y;
-		z += v.z;
-	}
-	Vector operator*(float value) {
-		return Vector(x * value, y * value, z * value);
-	}
-	Vector operator/(float value) {
-		return Vector(x / value, y / value, z / value);
-	}
-	Vector operator *(Vector v) {//cross multiblication
-		return Vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
-	}
+	// Loading Model files
+	model_gun.Load("Models/gun/PortalGun.3DS");
 
-};
-Vector unitVector(Vector b) {
-	Vector unitVector = b / (sqrt(b.x * b.x + b.y * b.y + b.z * b.z));
-	return unitVector;
-}
-int vectorLength(Vector v) {
-	return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+	// Loading texture files
+	tex_ground.Load("Textures/ground.bmp");
+	wallTex.Load("Textures/wall.bmp");
+	loadBMP(&tex, "Textures/blu-sky-3.bmp", true);
 }
 
-// Model Variables
-Model_3DS model_house;
-Model_3DS model_tree;
-
-// Textures
-GLTexture tex_ground;
-GLTexture wallTex;
 
 
-class Camera {
-public:
-	Vector Eye, At, Up;
 
-	Camera(float EyeX = 20.0f, float EyeY = 8.0f, float EyeZ = 1.0f, float AtX = 0.0f, float AtY = 0.0f, float AtZ = 0.0f, float UpX = 0.0f, float UpY = 1.0f, float UpZ = 0.0f) {
-		Eye = Vector(EyeX, EyeY, EyeZ);
-		At = Vector(AtX, AtY, AtZ);
-		Up = Vector(UpX, UpY, UpZ);
-	}
-
-	void moveX(float d) {
-		Vector right = unitVector(Up *(At - Eye));
-		right.y = 0;
-		Eye = Eye + right * d;
-		At = At + right * d;
-	}
-
-	void moveY(float d) {
-		Eye = Eye + unitVector(Up) * d;
-		At = At + unitVector(Up) * d;
-	}
-
-	void moveZ(float d) {
-		Vector view = unitVector(At - Eye);
-		view.y = 0;
-		Eye = Eye + view * d;
-		At = At + view * d;
-	}
-
-	void rotateX(float a) {
-		Vector view = unitVector(At - Eye);
-		Vector right = unitVector(Up*(view));
-		view = view * cos(DEG2RAD(a)) + Up * sin(DEG2RAD(a));
-		Up = view*(right);
-		At = Eye + view;
-	}
-
-	void rotateY(float a) {
-		Vector view = unitVector(At - Eye);
-		Vector right = unitVector(Up*(view));
-		view = view * cos(DEG2RAD(a)) + right * sin(DEG2RAD(a));
-		right = view*(Up);
-		At = Eye + view;
-	}
-
-	void look() {
-		gluLookAt(
-			Eye.x, Eye.y, Eye.z,
-			At.x, At.y, At.z,
-			Up.x, Up.y, Up.z
-		);
-	}
-};
-
-Camera camera;
 
 //=======================================================================
 // Lighting Configuration Function
@@ -442,49 +587,125 @@ void Keyboard(unsigned char key, int x, int y) {
 
 	switch (key) {
 	case 'w':
-		camera.moveY(d);
+		player.front = true;
+		//player.camera.moveY(d);
 		break;
 	case 's':
-		camera.moveY(-d);
+		player.back = true;
+		//player.camera.moveY(-d);
 		break;
 	case 'a':
-		camera.moveX(d);
+		player.left = true;
+		//player.camera.moveX(d);
 		break;
 	case 'd':
-		camera.moveX(-d);
+		player.right = true;
+		//player.camera.moveX(-d);
 		break;
 	case 'q':
-		camera.moveZ(d);
+		//player.camera.moveZ(d);
 		break;
 	case 'e':
-		camera.moveZ(-d);
+		player.camera.moveZ(-d);
 		break;
+	case '1':
+		player.firstPerson();
+		break;
+	//case GLUT_KEY_ESCAPE:
+	//	exit(EXIT_SUCCESS);
+	}
 
+}
+
+void keyUp(unsigned char key, int x, int y) {
+
+	switch (key) {
+	case 'w':
+		player.front = false;
+		//player.camera.moveY(d);
+		break;
+	case 's':
+		player.back = false;
+		//player.camera.moveY(-d);
+		break;
+	case 'a':
+		player.left = false;
+		//player.camera.moveX(d);
+		break;
+	case 'd':
+		player.right = false;
+		//player.camera.moveX(-d);
+		break;
+	case 'q':
+		//player.camera.moveZ(d);
+		break;
+	case 'e':
+		break;
+	case '1':
+		player.firstPerson();
+		break;
 	case GLUT_KEY_ESCAPE:
 		exit(EXIT_SUCCESS);
 	}
 
-	glutPostRedisplay();
 }
+
 void Special(int key, int x, int y) {
 	float a = 2.0;
 
 	switch (key) {
 	case GLUT_KEY_UP:
-		camera.rotateX(a);
+		player.camera.rotateX(a);
 		break;
 	case GLUT_KEY_DOWN:
-		camera.rotateX(-a);
+		player.camera.rotateX(-a);
 		break;
 	case GLUT_KEY_LEFT:
-		camera.rotateY(a);
+		player.camera.rotateY(a);
 		break;
 	case GLUT_KEY_RIGHT:
-		camera.rotateY(-a);
+		player.camera.rotateY(-a);
 		break;
 	}
 
-	glutPostRedisplay();
+}
+
+void mouseMove(int x, int y) {
+	/*double half = 863 / 2;
+	player.camera.At.y += (half - y) / (abs(half-y)/5);
+	cout << player.camera.At.y << endl;*/
+	/*GLdouble temp = (half - y) / 10.0;
+	if (temp < 0) {
+		player.camera.moveY(-0.2);
+
+	}else
+		player.camera.moveY(0.2);*/
+
+	if (x > preX) {
+		player.camera.rotateY(0.05);
+	}
+	else if (x < preX) {
+		player.camera.rotateY(-0.05);
+	}
+
+	if (y > preY) {
+		player.camera.moveY(0.05);
+	}
+	else if (y < preY) {
+		player.camera.moveY(-0.05);
+	}
+
+	if (x == 0 || x==1535 || y==0 || y==863) {
+		glutWarpPointer(1535 / 2, 863 / 2);
+		preX = 1535 / 2;
+		preY = 863 / 2;
+	}
+	else {
+	preX = x;
+	preY = y;
+	}
+
+
 }
 
 //=======================================================================
@@ -539,6 +760,7 @@ void myDisplay(void)
 	// Draw Ground
 	RenderGround();
 
+
 	//sky box
 	glPushMatrix();
 
@@ -554,55 +776,13 @@ void myDisplay(void)
 
 
 	glPopMatrix();
-
-	Wall wall = Wall(0, 0, 0, 0, 10, 10, 10, wallTex);
-	wall.draw();
-	Player player = Player(0, 0, 0, 0);
+	wall.wallTex = wallTex;
+	//wall.draw();
 	player.draw();
 
 
 
 	glutSwapBuffers();
-}
-
-//=======================================================================
-// Keyboard Function
-//=======================================================================
-void myKeyboard(unsigned char button, int x, int y)
-{
-	switch (button)
-	{
-	case 'w':
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		break;
-	case 'r':
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		break;
-	case 27:
-		exit(0);
-		break;
-	default:
-		break;
-	}
-
-	glutPostRedisplay();
-}
-
-//=======================================================================
-// Motion Function
-//=======================================================================
-
-//=======================================================================
-// Assets Loading Function
-//=======================================================================
-void LoadAssets()
-{
-	// Loading Model files
-
-	// Loading texture files
-	tex_ground.Load("Textures/ground.bmp");
-	wallTex.Load("Textures/wall.bmp");
-	loadBMP(&tex, "Textures/blu-sky-3.bmp", true);
 }
 
 void setupLights() {
@@ -627,12 +807,21 @@ void setupCamera() {
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	camera.look();
+	player.camera.look();
 }
 
 //=======================================================================
 // Main Function
 //=======================================================================
+
+
+void refresh(int) { // 100 frames per second
+	glutPostRedisplay();
+	glutTimerFunc(10,refresh,0);
+}
+
+
+
 void main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
@@ -641,15 +830,23 @@ void main(int argc, char** argv)
 
 	glutInitWindowSize(WIDTH, HEIGHT);
 
-	glutInitWindowPosition(100, 150);
+	glutInitWindowPosition(-150, -150);
 
 	glutCreateWindow(title);
+	glutFullScreen();
+	//glutSetCursor(GLUT_CURSOR_NONE);
 
+	glutPassiveMotionFunc(mouseMove);
+
+	LoadAssets();
 	glutDisplayFunc(myDisplay);
 
+	glutTimerFunc(10, playerUpdate, 0);
+	glutTimerFunc(10, refresh, 0);
+
 	glutKeyboardFunc(Keyboard);
+	glutKeyboardUpFunc(keyUp);
 	glutSpecialFunc(Special);
-	LoadAssets();
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
@@ -657,6 +854,10 @@ void main(int argc, char** argv)
 	glEnable(GL_COLOR_MATERIAL);
 
 	glShadeModel(GL_SMOOTH);
+
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	glutWarpPointer(1535 / 2, 863/ 2);
 
 	glutMainLoop();
 }
