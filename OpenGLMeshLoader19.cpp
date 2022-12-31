@@ -34,6 +34,7 @@ int WIDTH = 1920;
 int HEIGHT = 1080;
 
 int preX = 1535/2, preY = 863/2;
+bool gameReady = false;
 
 GLuint tex;
 char title[] = "3D Model Loader Sample";
@@ -49,6 +50,8 @@ GLdouble zFar = 100;
 Model_3DS model_house;
 Model_3DS model_tree;
 Model_3DS model_gun;
+Model_3DS model_display;
+Model_3DS model_terror;
 
 // Textures
 GLTexture tex_ground;
@@ -104,14 +107,24 @@ public:
 	Vector operator *(Vector v) {//cross multiblication
 		return Vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
 	}
+	string toString() {
+		return to_string(x) +" " + to_string(y) + " " + to_string(z);
+	}
 
 };
 Vector unitVector(Vector b) {
 	Vector unitVector = b / (sqrt(b.x * b.x + b.y * b.y + b.z * b.z));
 	return unitVector;
 }
-int vectorLength(Vector v) {
+double magnitude(Vector v) {
 	return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+double dotProduct(Vector a, Vector b) {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+double rotation_angle(Vector a, Vector b) { 
+	// the angle between two vectors is to get the cos inverse of the dot product diviede by the magnitudes of the vectors 
+	return DEG2RAD(acos(dotProduct(a, b) / (magnitude(a) * magnitude(b))));
 }
 
 
@@ -119,7 +132,7 @@ class Camera {
 public:
 	Vector Eye, At, Up;
 
-	Camera(float EyeX = 20.0f, float EyeY = 8.0f, float EyeZ = 1.0f, float AtX = 8.0f, float AtY = 0.0f, float AtZ = 0.0f, float UpX = 0.0f, float UpY = 1.0f, float UpZ = 0.0f) {
+	Camera(float EyeX = 7.6f, float EyeY = 2.35f, float EyeZ = 0.0f, float AtX = 0.0f, float AtY = 0.0f, float AtZ = 0.0f, float UpX = 0.0f, float UpY = 1.0f, float UpZ = 0.0f) {
 		Eye = Vector(EyeX, EyeY, EyeZ);
 		At = Vector(AtX, AtY, AtZ);
 		Up = Vector(UpX, UpY, UpZ);
@@ -134,10 +147,13 @@ public:
 
 	void moveY(float d) {
 		//Eye = Eye + unitVector(Up) * d;
-		At = At + unitVector(Up) * d;
-		At.y =  min(At.y, 3);
+		//At = At + unitVector(Up) * d;
+		/*At.y =  min(At.y, 3);*/
+		At.y += d;
+		if (At.y > 5) At.y = 5;
+		else if (At.y < -2) At.y = -2;
 
-		cout<<Up.x <<" " << Up.y << " " << Up.z << endl;
+
 	}
 
 	void moveZ(float d) {
@@ -156,11 +172,21 @@ public:
 	}
 
 	void rotateY(float a) {
-		Vector view = unitVector(At - Eye);
+		/*Vector temp1 = Eye + Vector(0, 0, 0);
+		Vector temp2 = At + Vector(0, 0, 0);
+		temp1.y = 0;
+		temp2.y = 0;
+		GLdouble atY = At.y;
+		Vector view = unitVector(temp2 - temp1);
 		Vector right = unitVector(Up * (view));
 		view = view * cos(DEG2RAD(a)) + right * sin(DEG2RAD(a));
 		right = view * (Up);
 		At = Eye + view;
+		At.y = atY;*/
+		
+		At = Eye + unitVector(At - Eye) * cos(DEG2RAD(a)) + unitVector(Up * (unitVector(At - Eye))) * sin(DEG2RAD(a));
+
+
 	}
 
 	void look() {
@@ -172,6 +198,8 @@ public:
 	}
 
 };
+
+Camera cam;
 
 class Wall
 {
@@ -290,7 +318,7 @@ public:
 	GLdouble x, y, z, r;
 	GLdouble speed = 0.2;
 	Camera camera;
-	bool left = false, right = false, front = false, back = false, isFirstPerson = true, isStable = false;
+	bool left = false, right = false, front = false, back = false, isFirstPerson = true;
 	GLdouble yaw = 0;
 	Player(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _r) {
 		x = _x; // x coord of the center point
@@ -299,21 +327,36 @@ public:
 		r = _r;	// rotation angle
 	}
 
-	void move(Vector v) { // movement direction
-		Vector u = unitVector(v);
-		r = atan(u.x / u.z);
-		x + u.x * speed;
-		y + u.y * speed;
-		z + u.z * speed;
-		x + u.x * speed;
+	void rotateY(double m) {
+		if (isFirstPerson) {
+			camera.Eye.x = x - .3 * cos(DEG2RAD(-r));
+			camera.Eye.z = z - .3 * sin(DEG2RAD(-r));
+			camera.At.x = x - 8 * cos(DEG2RAD(-r));
+			camera.At.z = z - 8 * sin(DEG2RAD(-r));
 
+		}
+		else {
+			camera.Eye.x = x + 8 * cos(DEG2RAD(-r));
+			camera.Eye.z = z + 8 * sin(DEG2RAD(-r));
+			camera.Eye.y = 8;
+			camera.At.x = x - 8 * cos(DEG2RAD(-r));
+			camera.At.z = z - 8 * sin(DEG2RAD(-r));
+		}
+		r += m;
+		r = (r / 360 - (int)r / 360) * 360 ;
+	}
+	void moveY(double m) {
+		camera.moveY(m);
 	}
 
 	void draw() {
+		glPushMatrix();
+		glTranslated(x, 0, z);
+		glRotated(r, 0, 1, 0);
+
 		//legs and center
 		glPushMatrix();
-		glTranslated(x, 1.5, z);
-		glRotated(r, 0, 1, 0);
+		glTranslated(0, 1.5, 0);
 		glScaled(.5, 1, .7);
 		glColor3f(.8, 0, 0);
 		glutSolidCube(1);
@@ -365,8 +408,7 @@ public:
 
 
 		glPushMatrix();//head
-		glTranslated(x, 2, z);
-		glRotated(r, 0, 1, 0);
+		glTranslated(0, 2, 0);
 		glColor3f(.54, .45, .31);
 		glScaled(.3, .7, .4);
 
@@ -375,8 +417,7 @@ public:
 
 
 		glPushMatrix();//arms
-		glTranslated(x, 1.5, z);
-		glRotated(r, 0, 1, 0);
+		glTranslated(0, 1.5, 0);
 		glColor3f(.8, 0, 0);
 
 		glScaled(.5, .2, 1);
@@ -408,43 +449,51 @@ public:
 		glutSolidCube(1);
 
 		glPopMatrix();
-
+		glEnable(GL_TEXTURE_2D);
 		glPushMatrix();
-		glTranslated(x, 1.5, z);
+		glTranslated(-1, 1.5, -.2);
+		glRotated(55,0,1,0);
 		glScaled(.5,.5,.5);
 		model_gun.Draw();
 		glPopMatrix();
+		glPopMatrix();
 	}
 	void firstPerson() {
-		Vector view = unitVector(camera.At - camera.Eye);
-
-		//x = camera.Eye.x-.4;
-		//z = camera.Eye.z;
-
-		//camera.Eye.x = x + .4;
-		//camera.Eye.z = z;
-		//camera.Eye.y = y;
-
-		camera.Eye = camera.At - Vector(8,0,0);
-		camera.Eye.y = 1.5;
 
 
 
-		/*GLdouble dis = (x - camera.At.x) * (x - camera.At.x) + (y - camera.At.y) * (y - camera.At.y) + (z - camera.At.z) * (z - camera.At.z);
-		if (dis < 10) {
-			camera.At += view * (10 - dis) * view;
-		}
-		else {
-			camera.At -= view * (10 - dis) * view;
-		}*/
+		isFirstPerson = true;
+
+
+
+		camera.Up.x = 0;
+		camera.Up.y = 1;
+		camera.Up.z = 0;
+
+		camera.Eye.x = x - .3 * cos(DEG2RAD(-r));
+		camera.Eye.z = z - .3 * sin(DEG2RAD(-r));
+		camera.Eye.y = 2.35;
+		camera.At.x = x - 8 * cos(DEG2RAD(-r));
+		camera.At.z = z - 8 * sin(DEG2RAD(-r));
+
+
+
+
 	}
 	void thirdPerson() {
-		camera.Eye.x = x - 2;
-		camera.Eye.z = z;
-		camera.Eye.y = y + 5;
-		//camera.At.x = 1;
-		//camera.At.y = 0;
-		//camera.At.z = 0;
+
+
+		isFirstPerson = false;
+
+		camera.Up.x = 0;
+		camera.Up.y = 1;
+		camera.Up.z = 0;
+
+		camera.Eye.x = x + 8 * cos(DEG2RAD(-r));
+		camera.Eye.z = z + 8 * sin(DEG2RAD(-r));
+		camera.Eye.y = 8;
+		camera.At.x = x - 8 * cos(DEG2RAD(-r));
+		camera.At.z = z - 8 * sin(DEG2RAD(-r));
 	}
 
 	void update() {
@@ -458,8 +507,6 @@ public:
 			vec = camera.Eye - vec;
 			x += vec.x;
 			z += vec.z;
-
-
 		}
 		if (right) {
 			//x += speed;
@@ -468,6 +515,7 @@ public:
 			vec.y = camera.Eye.y;
 			vec.z = camera.Eye.z;
 			camera.moveX(-speed);
+			vec = camera.Eye - vec;
 			x += vec.x;
 			z += vec.z;
 		}
@@ -478,6 +526,7 @@ public:
 			vec.y = camera.Eye.y;
 			vec.z = camera.Eye.z;
 			camera.moveZ(speed);
+			vec = camera.Eye - vec;
 			x += vec.x;
 			z += vec.z;
 		}
@@ -488,28 +537,21 @@ public:
 			vec.y = camera.Eye.y;
 			vec.z = camera.Eye.z;
 			camera.moveZ(-speed);
+			vec = camera.Eye - vec;
 			x += vec.x;
 			z += vec.z;
 		}
-		if (!isStable) {
-			if (isFirstPerson) {
-				firstPerson();
-			}
-			else {
-				thirdPerson();
-			}
-			isStable = true;
-		}
+		
 
 	}
 };
 
 Wall wall = Wall(0, 0, 0, 0, 10, 10, 10, wallTex);
-Player player = Player(0, 2.35, 0, 0);
+Player player = Player(8, 2.35, 0, 0);
 
 void playerUpdate(int x) {
 	player.update();
-	glutTimerFunc(10, playerUpdate, 0);
+	glutTimerFunc(20, playerUpdate, 0);
 }
 
 
@@ -518,7 +560,8 @@ void LoadAssets()
 {
 	// Loading Model files
 	model_gun.Load("Models/gun/PortalGun.3DS");
-
+	model_display.Load("Models/display/scifi_display_3DS.3DS");
+	model_terror.Load("Models/torremoba/torremoba3ds.3DS");
 	// Loading texture files
 	tex_ground.Load("Textures/ground.bmp");
 	wallTex.Load("Textures/wall.bmp");
@@ -611,8 +654,24 @@ void Keyboard(unsigned char key, int x, int y) {
 	case '1':
 		player.firstPerson();
 		break;
-	//case GLUT_KEY_ESCAPE:
-	//	exit(EXIT_SUCCESS);
+	case '2':
+		player.thirdPerson();
+		break;
+
+	case 'i':
+		player.camera.Eye.y += .1;
+		break;
+	case 'k':
+		player.camera.Eye.y -= .1;
+		break;
+	case 'j':
+		player.camera.Eye.x += .1;
+		break;
+	case 'l':
+		player.camera.Eye.x -= .1;
+		break;
+	case GLUT_KEY_ESCAPE:
+		exit(EXIT_SUCCESS);
 	}
 
 }
@@ -642,7 +701,7 @@ void keyUp(unsigned char key, int x, int y) {
 	case 'e':
 		break;
 	case '1':
-		player.firstPerson();
+		//player.firstPerson();
 		break;
 	case GLUT_KEY_ESCAPE:
 		exit(EXIT_SUCCESS);
@@ -681,18 +740,25 @@ void mouseMove(int x, int y) {
 	}else
 		player.camera.moveY(0.2);*/
 
+
+	if (!gameReady)
+	{
+		return;
+	}
 	if (x > preX) {
-		player.camera.rotateY(0.05);
+		player.rotateY(-1);
+
 	}
 	else if (x < preX) {
-		player.camera.rotateY(-0.05);
+		player.rotateY(1);
+
 	}
 
 	if (y > preY) {
-		player.camera.moveY(0.05);
+		player.moveY(-.1);
 	}
 	else if (y < preY) {
-		player.camera.moveY(-0.05);
+		player.moveY(0.1);
 	}
 
 	if (x == 0 || x==1535 || y==0 || y==863) {
@@ -780,7 +846,15 @@ void myDisplay(void)
 	//wall.draw();
 	player.draw();
 
+	cout<<"player "<<Vector(player.x, player.y, player.z).toString() << endl;
+	cout<<" Eye "<<player.camera.Eye.toString() << endl;
+	cout << " At " << player.camera.At.toString() << endl;
 
+	//model_display.Draw();
+
+	//glPushMatrix();
+	//model_terror.Draw();
+	//glPopMatrix();
 
 	glutSwapBuffers();
 }
@@ -817,10 +891,12 @@ void setupCamera() {
 
 void refresh(int) { // 100 frames per second
 	glutPostRedisplay();
-	glutTimerFunc(10,refresh,0);
+	glutTimerFunc(20,refresh,0);
 }
 
-
+void startGame(int) {
+	gameReady = true;
+}
 
 void main(int argc, char** argv)
 {
@@ -834,7 +910,7 @@ void main(int argc, char** argv)
 
 	glutCreateWindow(title);
 	glutFullScreen();
-	//glutSetCursor(GLUT_CURSOR_NONE);
+	glutSetCursor(GLUT_CURSOR_NONE);
 
 	glutPassiveMotionFunc(mouseMove);
 
@@ -843,6 +919,8 @@ void main(int argc, char** argv)
 
 	glutTimerFunc(10, playerUpdate, 0);
 	glutTimerFunc(10, refresh, 0);
+	glutTimerFunc(1000, startGame, 0);
+
 
 	glutKeyboardFunc(Keyboard);
 	glutKeyboardUpFunc(keyUp);
