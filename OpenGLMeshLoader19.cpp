@@ -38,7 +38,7 @@ void drawWall(double x, double y, double z, double rotation);
 int WIDTH = 1920;
 int HEIGHT = 1080;
 
-int preX = 1535/2, preY = 863/2;
+int preX = 1535 / 2, preY = 863 / 2;
 bool gameReady = false;
 int level = 1;
 GLuint tex;
@@ -66,6 +66,7 @@ Model_3DS model_4;
 GLTexture tex_ground;
 GLTexture wallTex;
 GLTexture boarderWall;
+GLTexture doorTex;
 
 
 //================================================================================================//
@@ -127,7 +128,7 @@ public:
 		return Vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
 	}
 	string toString() {
-		return to_string(x) +" " + to_string(y) + " " + to_string(z);
+		return to_string(x) + " " + to_string(y) + " " + to_string(z);
 	}
 
 };
@@ -141,17 +142,30 @@ double magnitude(Vector v) {
 double dotProduct(Vector a, Vector b) {
 	return a.x * b.x + a.y * b.y + a.z * b.z;
 }
-double rotation_angle(Vector a, Vector b) { 
+double rotation_angle(Vector a, Vector b) {
 	// the angle between two vectors is to get the cos inverse of the dot product diviede by the magnitudes of the vectors 
 	return DEG2RAD(acos(dotProduct(a, b) / (magnitude(a) * magnitude(b))));
 }
+
+GLdouble square(GLdouble num) {
+	return num * num;
+}
+GLdouble getDistanceFromCenter(GLdouble x, GLdouble y, GLdouble z, Vector v2) {
+	return (square(x - v2.x) + square(y - v2.y) + square(z - v2.z));
+}
+vector< Vector> portals;
+
+
+
 class Portal {
 public:
 	Vector pos = Vector(0, 0, 0);
 	GLdouble  r = 10, h = 1;
-	Portal() {
 
-	};
+	Portal() {};
+	Portal(Vector _pos) {
+		pos = _pos;
+	}
 	void draw() {
 		glPushMatrix();
 		glTranslated(pos.x, pos.y, pos.z);
@@ -164,12 +178,8 @@ public:
 		pos.z = _z;
 	}
 };
-GLdouble square(GLdouble num) {
-	return num * num;
-}
-GLdouble getDistanceFromCenter(GLdouble x, GLdouble y, GLdouble z, Vector v2) {
-	return (square(x - v2.x) + square(y - v2.y) + square(z - v2.z));
-}
+
+
 
 class Camera {
 public:
@@ -226,7 +236,7 @@ public:
 		right = view * (Up);
 		At = Eye + view;
 		At.y = atY;*/
-		
+
 		At = Eye + unitVector(At - Eye) * cos(DEG2RAD(a)) + unitVector(Up * (unitVector(At - Eye))) * sin(DEG2RAD(a));
 
 
@@ -247,15 +257,14 @@ Camera cam;
 class Wall
 {
 public:
-	GLdouble x, y, z, r, l, h, w;
+	GLdouble x, y, z, l, h, w;
 	GLTexture wallTex;
 
-	Wall(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _r, GLdouble _l, GLdouble _h, GLdouble _w, GLTexture _wallTex)
+	Wall(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _l, GLdouble _h, GLdouble _w, GLTexture _wallTex)
 	{
 		x = _x; // x coord of the center point
 		y = _y; // y coord of the center point
 		z = _z;	// z coord of the center point
-		r = _r;	// rotation angle
 		l = _l; // length of the wall
 		h = _h; // height of the wall
 		w = _w; // width of the wall
@@ -269,7 +278,6 @@ public:
 
 		glColor3f(1, 1, 1);
 		glTranslated(x, 0, z);
-		glRotated(r, 0, 1, 0);
 
 		glEnable(GL_TEXTURE_2D);
 
@@ -354,6 +362,7 @@ public:
 
 
 };
+vector< Wall > firstLevelWalls;
 
 class Player
 {
@@ -362,7 +371,9 @@ public:
 	GLdouble speed = 0.2;
 	Camera camera;
 	bool left = false, right = false, front = false, back = false, isFirstPerson = true;
-	Portal portal1, portal2;
+	Portal portal1, portal2 ;
+
+	//tuple<Shot, Shot> shots;
 	Player(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _r) {
 		x = _x; // x coord of the center point
 		y = _y; // y coord of the center point
@@ -387,7 +398,7 @@ public:
 			camera.At.z = z - 8 * sin(DEG2RAD(-r));
 		}
 		r += m;
-		r = (r / 360 - (int)r / 360) * 360 ;
+		r = (r / 360 - (int)r / 360) * 360;
 	}
 	void moveY(double m) {
 		camera.moveY(m);
@@ -397,7 +408,7 @@ public:
 		glPushMatrix();
 		glTranslated(x, 0, z);
 		glRotated(r, 0, 1, 0);
-		
+
 		glPushMatrix();
 		glRotated(-90, 0, 1, 0);
 		glScaled(.2, .2, .2);
@@ -408,9 +419,9 @@ public:
 		glEnable(GL_TEXTURE_2D);
 		glPushMatrix();
 		glTranslated(-1, 2, -.4);
-		if(!isFirstPerson) glTranslated(.5, -.2, -.3);
-		glRotated(55,0,1,0);
-		glScaled(.5,.5,.5);
+		if (!isFirstPerson) glTranslated(.5, -.2, -.3);
+		glRotated(55, 0, 1, 0);
+		glScaled(.5, .5, .5);
 		model_gun.Draw();
 		glPopMatrix();
 		glPopMatrix();
@@ -446,11 +457,53 @@ public:
 		camera.At.x = x - 8 * cos(DEG2RAD(-r));
 		camera.At.z = z - 8 * sin(DEG2RAD(-r));
 	}
+	int isInWall(Wall wall) {
+		GLdouble radius = 1;
+		GLdouble l; GLdouble w;
+		l = wall.l;// x
+		w = wall.w;// z
 
+		if (abs(wall.x - x) <= radius + l / 2.0 && abs(wall.z - z) <= radius + w / 2.0) {
+			GLdouble dirX = (wall.x - x);
+			GLdouble dirZ = (wall.z - z);
+			if (wall.x + l / 2.0 > x && x > wall.x - l / 2.0) {
+				if (dirZ >= 0)
+					return 4;
+				return 3;
+			}
+			if (wall.z + w / 2.0 > z && z > wall.z - w / 2.0)
+			{
+				if (dirX >= 0)
+					return 2;
+				return 1;
+			}
+		}
+
+		return 0;
+	}
 	void update() {
+
+		GLdouble dir = 0;
+		for (int i = 0; i < firstLevelWalls.size(); i++) {
+			Wall cur = firstLevelWalls[i];
+			if (isInWall(cur))
+				dir = isInWall(cur);
+			cout << isInWall(cur) << endl;
+			Vector look = camera.At - camera.Eye;
+			cout << look.toString() << endl;
+
+		}
+		Vector look = camera.At - camera.Eye;
 		if (left) {
-			//x-=speed;
-			Vector vec = Vector(0,0,0);
+			if (look.z >= 0 && dir == 2)
+				return;
+			if (look.z < 0 && dir == 1)
+				return;
+			if (look.x >= 0 && dir == 3)
+				return;
+			if (look.x < 0 && dir == 4)
+				return;
+			Vector vec = Vector(0, 0, 0);
 			vec.x = camera.Eye.x;
 			vec.y = camera.Eye.y;
 			vec.z = camera.Eye.z;
@@ -460,7 +513,14 @@ public:
 			z += vec.z;
 		}
 		if (right) {
-			//x += speed;
+			if (look.z >= 0 && dir == 1)
+				return;
+			if (look.z < 0 && dir == 2)
+				return;
+			if (look.x >= 0 && dir == 4)
+				return;
+			if (look.x < 0 && dir == 3)
+				return;
 			Vector vec = Vector(0, 0, 0);
 			vec.x = camera.Eye.x;
 			vec.y = camera.Eye.y;
@@ -471,6 +531,14 @@ public:
 			z += vec.z;
 		}
 		if (front) {
+			if (look.x >= 0 && dir == 2)
+				return;
+			if (look.x < 0 && dir == 1)
+				return;
+			if (look.z >= 0 && dir == 4)
+				return;
+			if (look.z < 0 && dir == 3)
+				return;
 			//z -= speed;
 			Vector vec = Vector(0, 0, 0);
 			vec.x = camera.Eye.x;
@@ -480,8 +548,17 @@ public:
 			vec = camera.Eye - vec;
 			x += vec.x;
 			z += vec.z;
+
 		}
 		if (back) {
+			if (look.x >= 0 && dir == 1)
+				return;
+			if (look.x < 0 && dir == 2)
+				return;
+			if (look.z >= 0 && dir == 3)
+				return;
+			if (look.z < 0 && dir == 4)
+				return;
 			//z += speed;
 			Vector vec = Vector(0, 0, 0);
 			vec.x = camera.Eye.x;
@@ -492,9 +569,10 @@ public:
 			x += vec.x;
 			z += vec.z;
 		}
-		
+
 
 	}
+
 	void teleport() {
 		if (getDistanceFromCenter(x, y, z, portal1.pos) < portal1.r) {
 			x = portal2.pos.x;
@@ -519,17 +597,182 @@ public:
 	}
 };
 
-Wall wall = Wall(0, 0, 0, 0, 40, 10, 40, boarderWall);
-vector< Wall > firstLevelWalls;
+
+
+Wall wall = Wall(0, 0, 0, 40, 10, 40, boarderWall);
 
 Player player = Player(18, 2.35, 18, 0);
 
+
+class Shot
+{
+public:
+	Vector pos, dir;
+	int color;
+	bool state; // moving or still
+
+	Shot() {
+		pos = Vector(-5, -5, -5);
+	}
+	Shot(Vector _pos, Vector _dir, int _color) : pos(_pos), dir(unitVector(_dir)), color(_color), state(true) {
+	}
+
+	void draw() {
+		glPushMatrix();
+		glTranslated(pos.x, pos.y, pos.z);
+		glColor3f(1, 0, 0);
+		if (color == 1) glColor3f(0, 0, 1);
+		glScaled(1, .3, .3);
+		GLUquadricObj* sphere = gluNewQuadric();
+		gluQuadricTexture(sphere, true);
+		gluQuadricNormals(sphere, GLU_SMOOTH);
+		gluSphere(sphere, .2, 50, 50);
+		gluDeleteQuadric(sphere);
+		glPopMatrix();
+	}
+	//int isInWall(Wall wall) {
+	//	GLdouble radius = 1;
+	//	GLdouble l; GLdouble w;
+	//	l = wall.l;// x
+	//	w = wall.w;// z
+	//	if (abs(wall.x - pos.x) <= radius + l / 2.0 && abs(wall.z - pos.z) <= radius + w / 2.0) {
+	//		GLdouble dirX = (wall.x - pos.x);
+	//		GLdouble dirZ = (wall.z - pos.z);
+	//		if (wall.x + l / 2.0 > pos.x && pos.x > wall.x - l / 2.0) {
+	//			if (dirZ >= 0)
+	//				return 4;
+	//			return 3;
+	//		}
+	//		if (wall.z + w / 2.0 > pos.z && pos.z > wall.z - w / 2.0)
+	//		{
+	//			if (dirX >= 0)
+	//				return 2;
+	//			return 1;
+	//		}
+	//	}
+	//	return 0;
+	//}
+
+
+	bool move() {
+		// true if shot hit a portal window and false otherwise
+		if (state) pos += dir * .3;
+		for (int i = 0; i < portals.size(); i++) {
+			Vector a = portals[i];
+			if (getDistanceFromCenter(pos.x, pos.y, pos.z, a) < square(1)) {
+				state = false;
+				if (color == 0) {
+					player.portal1.update(a.x, a.y, a.z);
+				}
+				else {
+					player.portal2.update(a.x, a.y, a.z);
+				}
+					pos = Vector(-5, -5, -5);
+				return true;
+			}
+			else if (pos.x > 20 || pos.x < -20 || pos.z>20 || pos.z < -20) {
+				state = false;
+				pos = Vector(-5, -5, -5);
+				return false;
+			}
+		}
+
+		return false;
+	}
+
+};
+
+
+class Door {
+public:
+	Vector pos;
+	GLdouble l=2, h=5, w=5;
+	Door() {};
+	Door(Vector _pos) {
+		pos = _pos;
+	}
+	void draw() {
+		glPushMatrix();
+
+		glDisable(GL_LIGHTING);
+
+		glColor3f(1, 1, 1);
+		glTranslated(pos.x, 0, pos.z);
+
+		glEnable(GL_TEXTURE_2D);
+
+
+		glBindTexture(GL_TEXTURE_2D, doorTex.texture[0]);
+
+		glPushMatrix();
+
+		glColor3f(1, 1, 1);
+		glBegin(GL_QUADS);
+		glNormal3f(1, 0, 0);
+		glTexCoord2f(0, 0);
+		glVertex3f(-l / 2, 0, w / 2);
+		glTexCoord2f(1, 0);
+		glVertex3f(-l / 2, h, w / 2);
+		glTexCoord2f(1, 1);
+		glVertex3f(-l / 2, h, -w / 2);
+		glTexCoord2f(0, 1);
+		glVertex3f(-l / 2, 0, -w / 2);
+		glEnd();
+		glPopMatrix();
+
+
+		
+
+		glEnable(GL_LIGHTING);	// Enable lighting again for other entites coming throung the pipeline.
+		glColor3f(1, 1, 1);	// Set material back to white instead of grey used for the ground texture.
+		glDisable(GL_TEXTURE_2D);
+
+		glPopMatrix();
+	}
+
+
+};
+
+class Coin {
+public:
+	Vector pos;
+	Coin(Vector _pos) {
+		pos = _pos;
+	}
+	void draw() {
+		glPushMatrix();
+		glColor3f(1, 1, 0);
+		glTranslated(pos.x, pos.y, pos.z);
+		glutSolidSphere(.3,20,20);
+		glPopMatrix();
+	}
+
+	void pickUp() {
+		if (getDistanceFromCenter(player.x, player.y, player.z, pos) < square(1)) {
+			pos = Vector(-5, -5, -5);
+		}
+	}
+};
+
+Shot shot;
+Door door = Door(Vector(-19,0,0));
+Coin coin1 = Vector(15, 2, -15), coin2 = Vector(10,2,18);
 void playerUpdate(int x) {
 	player.update();
+	shot.move();
 	glutTimerFunc(20, playerUpdate, 0);
 }
 
+void drawTargets() {
+	for (int i = 0; i < portals.size(); i++) {
+		Vector portalPos = portals[i];
+		glPushMatrix();
+		glTranslated(portalPos.x, portalPos.y, portalPos.z);
+		glutSolidSphere(.1, 20, 20);
+		glPopMatrix();
 
+	}
+}
 
 void LoadAssets()
 {
@@ -546,6 +789,7 @@ void LoadAssets()
 	tex_ground.Load("Textures/ground.bmp");
 	wallTex.Load("Textures/wall.bmp");
 	boarderWall.Load("Textures/wall7.bmp");
+	doorTex.Load("Textures/door.bmp");
 	loadBMP(&tex, "Textures/blu-sky-3.bmp", true);
 }
 
@@ -608,7 +852,7 @@ void InitMaterial()
 //=======================================================================
 void Keyboard(unsigned char key, int x, int y) {
 	float d = 0.2;
-
+	Vector gunVector = Vector(player.x - 0.5 * sin(DEG2RAD(player.r)), 2, player.z - .5 * cos(DEG2RAD(player.r)));
 	switch (key) {
 	case 'w':
 		player.front = true;
@@ -627,10 +871,11 @@ void Keyboard(unsigned char key, int x, int y) {
 		//player.camera.moveX(-d);
 		break;
 	case 'q':
-		//player.camera.moveZ(d);
+		shot = Shot(gunVector, player.camera.At - gunVector, 0);
 		break;
 	case 'e':
-		player.camera.moveZ(-d);
+		//player.camera.moveZ(-d);
+		shot = Shot(gunVector, player.camera.At - gunVector, 1);
 		break;
 	case '1':
 		player.firstPerson();
@@ -653,7 +898,7 @@ void Keyboard(unsigned char key, int x, int y) {
 		break;
 	case GLUT_KEY_ESCAPE:
 		exit(EXIT_SUCCESS);
-	case ' ' :
+	case ' ':
 		player.teleport();
 		break;
 	}
@@ -745,14 +990,14 @@ void mouseMove(int x, int y) {
 		player.moveY(0.1);
 	}
 
-	if (x == 0 || x==1535 || y==0 || y==863) {
+	if (x == 0 || x == 1535 || y == 0 || y == 863) {
 		glutWarpPointer(1535 / 2, 863 / 2);
 		preX = 1535 / 2;
 		preY = 863 / 2;
 	}
 	else {
-	preX = x;
-	preY = y;
+		preX = x;
+		preY = y;
 	}
 
 
@@ -794,26 +1039,9 @@ void RenderGround()
 // Display Function
 //=======================================================================
 
-void drawShot(double x, double y, double z) {
-	glPushMatrix();
 
-	GLfloat lmodel_ambient[] = { 0.1f, 0.1f, 0.1f, 1.0f };
-	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lmodel_ambient);
 
-	GLfloat l0Diffuse[] = { 1.0f, 0.0f, 0.0f, 1.0f };
-	GLfloat l0Spec[] = { 1.0f, 1.0f, 0.0f, 1.0f };
-	GLfloat l0Ambient[] = { 0.1f, 0.0f, 0.0f, 1.0f };
-	GLfloat l0Position[] = { 10.0f, 0.0f, 0.0f, true };
-	GLfloat l0Direction[] = { -1.0, 0.0, 0.0 };
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, l0Diffuse);
-	glLightfv(GL_LIGHT0, GL_AMBIENT, l0Ambient);
-	glLightfv(GL_LIGHT0, GL_POSITION, l0Position);
-	glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 30.0);
-	glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 90.0);
-	glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, l0Direction);
 
-	glPopMatrix();
-}
 
 
 
@@ -830,7 +1058,7 @@ void myDisplay(void)
 	GLfloat lightPosition[] = { 0.0f, 100.0f, 0.0f, 0.0f };
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 	glLightfv(GL_LIGHT0, GL_AMBIENT, lightIntensity);
-
+	//glEnable(GL_TEXTURE_2D);
 	// Draw Ground
 	RenderGround();
 
@@ -848,13 +1076,20 @@ void myDisplay(void)
 	gluSphere(qobj, 100, 100, 100);
 	gluDeleteQuadric(qobj);
 
-
 	glPopMatrix();
+
+	//glDisable(GL_TEXTURE_2D);
+	drawTargets();
 	wall.draw();
 	player.draw();
-
-	cout<<"player "<<Vector(player.x, player.y, player.z).toString() << endl;
-	cout<<" Eye "<<player.camera.Eye.toString() << endl;
+	shot.draw();
+	door.draw();
+	coin1.draw();
+	coin1.pickUp();
+	coin2.draw();
+	coin2.pickUp();
+	cout << "player " << Vector(player.x, player.y, player.z).toString() << endl;
+	cout << " Eye " << player.camera.Eye.toString() << endl;
 	cout << " At " << player.camera.At.toString() << endl;
 
 	//model_display.Draw();
@@ -862,7 +1097,7 @@ void myDisplay(void)
 	//glPushMatrix();
 	//model_terror.Draw();
 	//glPopMatrix();
-	
+
 	glPushMatrix();
 	glTranslated(-5, 0, 0);
 	//model_2.Draw();
@@ -871,11 +1106,12 @@ void myDisplay(void)
 	//model_3.Draw();
 	glPopMatrix();
 
-	if(level ==1){
-		for (auto i = firstLevelWalls.begin(); i != firstLevelWalls.end();i++) {
-			(* i).draw();
+	if (level == 1) {
+		for (auto i = firstLevelWalls.begin(); i != firstLevelWalls.end(); i++) {
+			(*i).draw();
 		}
 	}
+	//drawShot(0,0,0);
 
 
 	glutSwapBuffers();
@@ -911,19 +1147,34 @@ void setupCamera() {
 //=======================================================================
 
 void setUpFirstLevel() {
-	player.portal1.update(5,5,5);
-	player.portal2.update(0, 0, 0);
+	player.portal1.update(15, 0, 18);
+	player.portal2.update(18, 0, 10);
 
 
 	// x, y, z, rotation, length, height, width, texture
 	wall.wallTex = boarderWall;
 
 	// first wall to the right 
-	firstLevelWalls.push_back(Wall(15, 0, 15, 0, 10, 10, 1, wallTex));
+	firstLevelWalls.push_back(Wall(12, 0, 15, 16, 10, 1, wallTex));
+
+
+	// coin one compartment
+	firstLevelWalls.push_back(Wall(12, 0, -10, 16, 3, 1, wallTex));
+	firstLevelWalls.push_back(Wall(5, 0, -15, 1, 3, 10, wallTex));
+
+	// door wall
+	firstLevelWalls.push_back(Wall(-10, 0, 0, 1, 3, 40, wallTex));
 
 	// first wall in the front 
-	firstLevelWalls.push_back(Wall(5, 0, 15, 90, 10, 10, 1, wallTex));
+	firstLevelWalls.push_back(Wall(5, 0, 15, 1, 10, 10, wallTex));
 
+
+
+
+	portals.push_back(Vector(0, 3, 0));
+	portals.push_back(Vector(5, 3, 5));
+	portals.push_back(Vector(15, 5, -15));
+	portals.push_back(Vector(-15, 5, 0));
 
 	//firstLevelWalls.push_back(Wall(0, 0, 0, 5, 5, 8, 1, wallTex));
 	gameReady = true;
@@ -931,7 +1182,7 @@ void setUpFirstLevel() {
 
 void refresh(int) { // 100 frames per second
 	glutPostRedisplay();
-	glutTimerFunc(20,refresh,0);
+	glutTimerFunc(20, refresh, 0);
 }
 
 
@@ -972,7 +1223,7 @@ void main(int argc, char** argv)
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
-	glutWarpPointer(1535 / 2, 863/ 2);
+	glutWarpPointer(1535 / 2, 863 / 2);
 
 	glutMainLoop();
 }
