@@ -16,7 +16,12 @@
 
 #include<chrono>
 #include<thread>
+#include <stdio.h>
+#include <random>
+#include <vector>
+#include <tuple>
 using namespace std;
+
 
 #define GLUT_KEY_ESCAPE 27
 #define DEG2RAD(a) (a * 0.0174532925)
@@ -35,7 +40,7 @@ int HEIGHT = 1080;
 
 int preX = 1535/2, preY = 863/2;
 bool gameReady = false;
-
+int level = 1;
 GLuint tex;
 char title[] = "3D Model Loader Sample";
 
@@ -52,13 +57,27 @@ Model_3DS model_tree;
 Model_3DS model_gun;
 Model_3DS model_display;
 Model_3DS model_terror;
+Model_3DS model_1;
+Model_3DS model_2;
+Model_3DS model_3;
+Model_3DS model_4;
 
 // Textures
 GLTexture tex_ground;
 GLTexture wallTex;
+GLTexture boarderWall;
 
 
 //================================================================================================//
+void drawCylinder(GLdouble r, GLdouble h) {
+	glPushMatrix();
+	glRotated(-90, 1, 0, 0);
+	GLUquadricObj* quad;
+	quad = gluNewQuadric();
+	gluCylinder(quad, r / 5.0, r / 5.0, h, 10, 10);
+	glPopMatrix();
+}
+
 
 class Vector
 {
@@ -126,7 +145,31 @@ double rotation_angle(Vector a, Vector b) {
 	// the angle between two vectors is to get the cos inverse of the dot product diviede by the magnitudes of the vectors 
 	return DEG2RAD(acos(dotProduct(a, b) / (magnitude(a) * magnitude(b))));
 }
+class Portal {
+public:
+	Vector pos = Vector(0, 0, 0);
+	GLdouble  r = 10, h = 1;
+	Portal() {
 
+	};
+	void draw() {
+		glPushMatrix();
+		glTranslated(pos.x, pos.y, pos.z);
+		drawCylinder(r, h);
+		glPopMatrix();
+	}
+	void update(GLdouble _x, GLdouble _y, GLdouble _z) {
+		pos.x = _x;
+		pos.y = _y;
+		pos.z = _z;
+	}
+};
+GLdouble square(GLdouble num) {
+	return num * num;
+}
+GLdouble getDistanceFromCenter(GLdouble x, GLdouble y, GLdouble z, Vector v2) {
+	return (square(x - v2.x) + square(y - v2.y) + square(z - v2.z));
+}
 
 class Camera {
 public:
@@ -319,7 +362,7 @@ public:
 	GLdouble speed = 0.2;
 	Camera camera;
 	bool left = false, right = false, front = false, back = false, isFirstPerson = true;
-	GLdouble yaw = 0;
+	Portal portal1, portal2;
 	Player(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _r) {
 		x = _x; // x coord of the center point
 		y = _y; // y coord of the center point
@@ -331,14 +374,15 @@ public:
 		if (isFirstPerson) {
 			camera.Eye.x = x - .3 * cos(DEG2RAD(-r));
 			camera.Eye.z = z - .3 * sin(DEG2RAD(-r));
+			camera.Eye.y = 3;
 			camera.At.x = x - 8 * cos(DEG2RAD(-r));
 			camera.At.z = z - 8 * sin(DEG2RAD(-r));
 
 		}
 		else {
-			camera.Eye.x = x + 8 * cos(DEG2RAD(-r));
-			camera.Eye.z = z + 8 * sin(DEG2RAD(-r));
-			camera.Eye.y = 8;
+			camera.Eye.x = x + 5 * cos(DEG2RAD(-r));
+			camera.Eye.z = z + 5 * sin(DEG2RAD(-r));
+			camera.Eye.y = 5;
 			camera.At.x = x - 8 * cos(DEG2RAD(-r));
 			camera.At.z = z - 8 * sin(DEG2RAD(-r));
 		}
@@ -353,118 +397,29 @@ public:
 		glPushMatrix();
 		glTranslated(x, 0, z);
 		glRotated(r, 0, 1, 0);
-
-		//legs and center
+		
 		glPushMatrix();
-		glTranslated(0, 1.5, 0);
-		glScaled(.5, 1, .7);
-		glColor3f(.8, 0, 0);
-		glutSolidCube(1);
+		glRotated(-90, 0, 1, 0);
+		glScaled(.2, .2, .2);
+		model_1.Draw();
 
-		/*
-		glTranslated(0, -.3, 0);
-
-		glScaled(1, .25, 1.5);
-		glutSolidCube(1.04);
-		glScaled(1, 4, .75);
-
-		glTranslated(0, .3, 0);
-		*/
-
-		glScaled(1, .5, .5);
-		glColor3f(0, .5, 0);
-
-		/*
-		glTranslated(0, -.8, -.5);//right
-		glutSolidCube(1.01);
-		glTranslated(0, 0, 1);//left
-		glutSolidCube(1.01);
-		*/
-		glTranslated(0, -.6, 0);
-		glScaled(1, .8, 2);
-
-		glutSolidCube(1.01);
-		glTranslated(0, .9, 0);
-
-		glScaled(1, 1.25, .5);
-		glTranslated(0, -.8, .5);//left
-
-
-
-		glColor3f(.54, .45, .31);
-		glTranslated(0, -.8, .1);//left
-		glutSolidCube(1.01);
-		glTranslated(0, 0, -1.2);//right
-		glutSolidCube(1.01);
-
-		glColor3f(.8, 0, 0);
-		glTranslated(0, -.8, 0);//right
-		glutSolidCube(1.02);
-		glTranslated(0, 0, 1.2);//left
-		glutSolidCube(1.02);
-
-
-		glPopMatrix();
-
-
-		glPushMatrix();//head
-		glTranslated(0, 2, 0);
-		glColor3f(.54, .45, .31);
-		glScaled(.3, .7, .4);
-
-		glutSolidCube(1);
-		glPopMatrix();
-
-
-		glPushMatrix();//arms
-		glTranslated(0, 1.5, 0);
-		glColor3f(.8, 0, 0);
-
-		glScaled(.5, .2, 1);
-
-		glTranslated(0, 2, 0);
-
-
-		glutSolidCube(1);
-		glTranslated(0, -1.5, 0);
-
-
-		glScaled(1, 4, .2);
-
-
-		glTranslated(0, 0, -2.5);//right arm
-		glutSolidCube(1);
-
-		glTranslated(0, 0, 5);//left arm
-		glutSolidCube(1);
-
-
-		glColor3f(.54, .45, .31);
-
-		glScaled(1, .25, 1);
-
-		glTranslated(0, -2.5, 0);//left hand
-		glutSolidCube(1);
-		glTranslated(0, 0, -5);//right hand
-		glutSolidCube(1);
 
 		glPopMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glPushMatrix();
-		glTranslated(-1, 1.5, -.2);
+		glTranslated(-1, 2, -.4);
+		if(!isFirstPerson) glTranslated(.5, -.2, -.3);
 		glRotated(55,0,1,0);
 		glScaled(.5,.5,.5);
 		model_gun.Draw();
 		glPopMatrix();
 		glPopMatrix();
+		portal1.draw();
+		portal2.draw();
+
 	}
 	void firstPerson() {
-
-
-
 		isFirstPerson = true;
-
-
 
 		camera.Up.x = 0;
 		camera.Up.y = 1;
@@ -472,16 +427,12 @@ public:
 
 		camera.Eye.x = x - .3 * cos(DEG2RAD(-r));
 		camera.Eye.z = z - .3 * sin(DEG2RAD(-r));
-		camera.Eye.y = 2.35;
+		camera.Eye.y = 3;
 		camera.At.x = x - 8 * cos(DEG2RAD(-r));
 		camera.At.z = z - 8 * sin(DEG2RAD(-r));
 
-
-
-
 	}
 	void thirdPerson() {
-
 
 		isFirstPerson = false;
 
@@ -489,9 +440,9 @@ public:
 		camera.Up.y = 1;
 		camera.Up.z = 0;
 
-		camera.Eye.x = x + 8 * cos(DEG2RAD(-r));
-		camera.Eye.z = z + 8 * sin(DEG2RAD(-r));
-		camera.Eye.y = 8;
+		camera.Eye.x = x + 5 * cos(DEG2RAD(-r));
+		camera.Eye.z = z + 5 * sin(DEG2RAD(-r));
+		camera.Eye.y = 5;
 		camera.At.x = x - 8 * cos(DEG2RAD(-r));
 		camera.At.z = z - 8 * sin(DEG2RAD(-r));
 	}
@@ -544,10 +495,34 @@ public:
 		
 
 	}
+	void teleport() {
+		if (getDistanceFromCenter(x, y, z, portal1.pos) < portal1.r) {
+			x = portal2.pos.x;
+			//y = portal2.pos.y;
+			z = portal2.pos.z;
+			camera.Eye.x = x;
+			camera.Eye.y = y + 3;
+			camera.Eye.z = z;
+
+
+		}
+		else if (getDistanceFromCenter(x, y, z, portal2.pos) < portal2.r) {
+			x = portal1.pos.x;
+			//y = portal1.pos.y;
+			z = portal1.pos.z;
+			camera.Eye.x = x;
+			camera.Eye.y = y + 3;
+			camera.Eye.z = z;
+		}
+		if (isFirstPerson) firstPerson();
+		else thirdPerson();
+	}
 };
 
-Wall wall = Wall(0, 0, 0, 0, 10, 10, 10, wallTex);
-Player player = Player(8, 2.35, 0, 0);
+Wall wall = Wall(0, 0, 0, 0, 40, 10, 40, boarderWall);
+vector< Wall > firstLevelWalls;
+
+Player player = Player(18, 2.35, 18, 0);
 
 void playerUpdate(int x) {
 	player.update();
@@ -562,9 +537,15 @@ void LoadAssets()
 	model_gun.Load("Models/gun/PortalGun.3DS");
 	model_display.Load("Models/display/scifi_display_3DS.3DS");
 	model_terror.Load("Models/torremoba/torremoba3ds.3DS");
+	model_1.Load("Models/ironman/Homem de ferro Edvaldo Costa Cordeiro.3DS");
+	//model_2.Load("Models/respawn/respawntool.3DS");
+	//model_3.Load("Models/wall/wall.3DS");
+	//model_4.Load("Models//	.3DS");
+
 	// Loading texture files
 	tex_ground.Load("Textures/ground.bmp");
 	wallTex.Load("Textures/wall.bmp");
+	boarderWall.Load("Textures/wall7.bmp");
 	loadBMP(&tex, "Textures/blu-sky-3.bmp", true);
 }
 
@@ -672,6 +653,9 @@ void Keyboard(unsigned char key, int x, int y) {
 		break;
 	case GLUT_KEY_ESCAPE:
 		exit(EXIT_SUCCESS);
+	case ' ' :
+		player.teleport();
+		break;
 	}
 
 }
@@ -809,6 +793,30 @@ void RenderGround()
 //=======================================================================
 // Display Function
 //=======================================================================
+
+void drawShot(double x, double y, double z) {
+	glPushMatrix();
+
+	GLfloat lmodel_ambient[] = { 0.1f, 0.1f, 0.1f, 1.0f };
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lmodel_ambient);
+
+	GLfloat l0Diffuse[] = { 1.0f, 0.0f, 0.0f, 1.0f };
+	GLfloat l0Spec[] = { 1.0f, 1.0f, 0.0f, 1.0f };
+	GLfloat l0Ambient[] = { 0.1f, 0.0f, 0.0f, 1.0f };
+	GLfloat l0Position[] = { 10.0f, 0.0f, 0.0f, true };
+	GLfloat l0Direction[] = { -1.0, 0.0, 0.0 };
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, l0Diffuse);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, l0Ambient);
+	glLightfv(GL_LIGHT0, GL_POSITION, l0Position);
+	glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 30.0);
+	glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 90.0);
+	glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, l0Direction);
+
+	glPopMatrix();
+}
+
+
+
 void myDisplay(void)
 {
 	setupCamera();
@@ -842,8 +850,7 @@ void myDisplay(void)
 
 
 	glPopMatrix();
-	wall.wallTex = wallTex;
-	//wall.draw();
+	wall.draw();
 	player.draw();
 
 	cout<<"player "<<Vector(player.x, player.y, player.z).toString() << endl;
@@ -855,6 +862,21 @@ void myDisplay(void)
 	//glPushMatrix();
 	//model_terror.Draw();
 	//glPopMatrix();
+	
+	glPushMatrix();
+	glTranslated(-5, 0, 0);
+	//model_2.Draw();
+	glPopMatrix();	glPushMatrix();
+	glTranslated(0, 0, 5);
+	//model_3.Draw();
+	glPopMatrix();
+
+	if(level ==1){
+		for (auto i = firstLevelWalls.begin(); i != firstLevelWalls.end();i++) {
+			(* i).draw();
+		}
+	}
+
 
 	glutSwapBuffers();
 }
@@ -888,15 +910,30 @@ void setupCamera() {
 // Main Function
 //=======================================================================
 
+void setUpFirstLevel() {
+	player.portal1.update(5,5,5);
+	player.portal2.update(0, 0, 0);
+
+
+	// x, y, z, rotation, length, height, width, texture
+	wall.wallTex = boarderWall;
+
+	// first wall to the right 
+	firstLevelWalls.push_back(Wall(15, 0, 15, 0, 10, 10, 1, wallTex));
+
+	// first wall in the front 
+	firstLevelWalls.push_back(Wall(5, 0, 15, 90, 10, 10, 1, wallTex));
+
+
+	//firstLevelWalls.push_back(Wall(0, 0, 0, 5, 5, 8, 1, wallTex));
+	gameReady = true;
+}
 
 void refresh(int) { // 100 frames per second
 	glutPostRedisplay();
 	glutTimerFunc(20,refresh,0);
 }
 
-void startGame(int) {
-	gameReady = true;
-}
 
 void main(int argc, char** argv)
 {
@@ -919,7 +956,7 @@ void main(int argc, char** argv)
 
 	glutTimerFunc(10, playerUpdate, 0);
 	glutTimerFunc(10, refresh, 0);
-	glutTimerFunc(1000, startGame, 0);
+	setUpFirstLevel();
 
 
 	glutKeyboardFunc(Keyboard);
