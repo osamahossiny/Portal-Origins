@@ -62,6 +62,10 @@ Model_3DS model_2;
 Model_3DS model_3;
 Model_3DS model_4;
 Model_3DS model_vending;
+Model_3DS model_goldCoin;
+Model_3DS model_silverCoin;
+
+
 
 
 // Textures
@@ -772,30 +776,41 @@ public:
 class Coin {
 public:
 	Vector pos;
-	GLTexture tex;
-	Coin(Vector _pos, GLTexture _tex) {
+	int type;
+	Coin(Vector _pos, int _type) {
 		pos = _pos;
-		tex = _tex;
+		type = _type;
 	}
 	void draw() {
-		
-		glPushMatrix();
-		glEnable(GL_TEXTURE_2D);		
-		GLUquadricObj* qobj;
-		qobj = gluNewQuadric();
-		glColor3f(1, 1, 1);
-		glTranslated(pos.x, pos.y, pos.z);
-		glRotated(90, 0, 1, 0);
-		//glScaled(.2,1,1);
-		glBindTexture(GL_TEXTURE_2D, tex.texture[0]);
-		gluQuadricTexture(qobj, true);
-		gluQuadricNormals(qobj, GL_SMOOTH);
-		gluDisk(qobj, .1, .3, 20, 20);
-		//gluSphere(qobj, .3, 20, 20);
-		gluDeleteQuadric(qobj);
+		if (type == 0) {
+			glPushMatrix();
+			glTranslated(pos.x, pos.y, pos.z);
 
-		glPopMatrix();
+			glRotated(90, 0, 0, 1 );
 
+			//glRotated(90,0, 0, 1);		
+
+			glScaled(.1, .1, .1);
+
+			model_silverCoin.Draw();
+
+			glPopMatrix();
+		}
+		else {
+			glPushMatrix();
+			glTranslated(pos.x, pos.y, pos.z);
+
+			glRotated(90, 0, 0, 1);
+
+			//glRotated(90,0, 0, 1);		
+
+			//glScaled(.1, .1, .1);
+
+			model_goldCoin.Draw();
+
+			glPopMatrix();
+
+		}
 	}
 
 	void pickUp() {
@@ -807,7 +822,7 @@ public:
 
 Shot shot1, shot2;
 Door door = Door(Vector(-19,0,0));
-Coin coin1 = Coin(Vector(15, 2, -15),silverTex), coin2 = Coin(Vector(10,2,18),silverTex);
+Coin coin1 = Coin(Vector(15, 2, -15),1), coin2 = Coin(Vector(10,2,18),1);
 void playerUpdate(int x) {
 	player.update();
 	shot1.move();
@@ -834,6 +849,8 @@ void LoadAssets()
 	model_terror.Load("Models/torremoba/torremoba3ds.3DS");
 	model_1.Load("Models/ironman/Homem de ferro Edvaldo Costa Cordeiro.3DS");
 	model_vending.Load("Models/Bitcoin_metal_coin.3ds");
+	model_goldCoin.Load("Models/gold/gold.3DS");
+	model_silverCoin.Load("Models/silver/Coin1.3DS");
 	//model_2.Load("Models/respawn/respawntool.3DS");
 	//model_3.Load("Models/wall/wall.3DS");
 	//model_4.Load("Models//	.3DS");
@@ -905,6 +922,34 @@ void InitMaterial()
 //=======================================================================
 // OpengGL Configuration Function
 //=======================================================================
+void setUpSecondLevel() {
+	player.x = -15;
+	player.z = 0;
+	player.r = 180;
+	player.portal1.update(-15, 0, 0);
+	player.portal2.update(-5, 0, 10);
+	coin1.pos = Vector(15, 3, 10);
+	coin2.pos = Vector(15, 3, 18);
+	firstLevelWalls.clear();
+	portals.clear();
+	firstLevelWalls.push_back(Wall(-10, 0, 0, 1, 3, 40, wallTex));
+	// coin two compartment
+	firstLevelWalls.push_back(Wall(12, 0, 15, 16, 3, 1, wallTex));
+	firstLevelWalls.push_back(Wall(5, 0, 0, 1, 3, 40, wallTex));
+
+	portals.push_back(Vector(15, 4, 18));
+	portals.push_back(Vector(15, 4, 10));
+
+	// x, y, z, rotation, length, height, width, texture
+	wall.wallTex = boarderWall;
+
+
+
+	//firstLevelWalls.push_back(Wall(0, 0, 0, 5, 5, 8, 1, wallTex));
+	gameReady = true;
+}
+
+
 void Keyboard(unsigned char key, int x, int y) {
 	float d = 0.2;
 	Vector gunVector = Vector(player.x - 0.5 * sin(DEG2RAD(player.r)), 2, player.z - .5 * cos(DEG2RAD(player.r)));
@@ -955,6 +1000,9 @@ void Keyboard(unsigned char key, int x, int y) {
 		exit(EXIT_SUCCESS);
 	case ' ':
 		player.teleport();
+		break;
+	case ']':
+		setUpSecondLevel();
 		break;
 	}
 
@@ -1183,12 +1231,11 @@ void myDisplay(void)
 	}
 
 
-	glPushMatrix();
-	glTranslated(25,1, 25);
-	glScaled(.1,.1,.1);
-	glColor3f(.5,.5,.5);
-	model_vending.Draw();
-	glPopMatrix();
+	//glPushMatrix();
+	//glTranslated(18,1, 18);
+	//glScaled(.1,.1,.1);
+	//glColor3f(.5,.5,.5);
+	//glPopMatrix();
 	glutSwapBuffers();
 }
 
