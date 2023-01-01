@@ -61,12 +61,17 @@ Model_3DS model_1;
 Model_3DS model_2;
 Model_3DS model_3;
 Model_3DS model_4;
+Model_3DS model_vending;
+
 
 // Textures
 GLTexture tex_ground;
 GLTexture wallTex;
 GLTexture boarderWall;
 GLTexture doorTex;
+GLTexture goldTex;
+GLTexture silverTex;
+
 
 
 //================================================================================================//
@@ -160,11 +165,12 @@ vector< Vector> portals;
 class Portal {
 public:
 	Vector pos = Vector(0, 0, 0);
-	GLdouble  r = 10, h = 1;
+	GLdouble  r = 10, h = .5;
 
 	Portal() {};
 	Portal(Vector _pos) {
 		pos = _pos;
+		pos.y = 4;
 	}
 	void draw() {
 		glPushMatrix();
@@ -174,7 +180,7 @@ public:
 	}
 	void update(GLdouble _x, GLdouble _y, GLdouble _z) {
 		pos.x = _x;
-		pos.y = _y;
+		pos.y = 4;
 		pos.z = _z;
 	}
 };
@@ -570,6 +576,35 @@ public:
 			z += vec.z;
 		}
 
+		if (x > 19) { 
+			x = 19; 
+			if (isFirstPerson) firstPerson();
+			else thirdPerson();
+			
+		}
+
+		if (z > 19) {
+			z = 19;
+			if (isFirstPerson) firstPerson();
+			else thirdPerson();
+
+		}
+
+		if (x < -19) {
+			x = -19;
+			if (isFirstPerson) firstPerson();
+			else thirdPerson();
+
+		}
+
+		if (z < -19) {
+			z = -19;
+			if (isFirstPerson) firstPerson();
+			else thirdPerson();
+
+		}
+
+
 
 	}
 
@@ -601,7 +636,7 @@ public:
 
 Wall wall = Wall(0, 0, 0, 40, 10, 40, boarderWall);
 
-Player player = Player(18, 2.35, 18, 0);
+Player player = Player(15, 2.35, 18, 0);
 
 
 class Shot
@@ -620,9 +655,10 @@ public:
 	void draw() {
 		glPushMatrix();
 		glTranslated(pos.x, pos.y, pos.z);
+		glRotated(90, 1, 0, 0);
 		glColor3f(1, 0, 0);
 		if (color == 1) glColor3f(0, 0, 1);
-		glScaled(1, .3, .3);
+		glScaled(.3, .3, .3);
 		GLUquadricObj* sphere = gluNewQuadric();
 		gluQuadricTexture(sphere, true);
 		gluQuadricNormals(sphere, GLU_SMOOTH);
@@ -736,15 +772,30 @@ public:
 class Coin {
 public:
 	Vector pos;
-	Coin(Vector _pos) {
+	GLTexture tex;
+	Coin(Vector _pos, GLTexture _tex) {
 		pos = _pos;
+		tex = _tex;
 	}
 	void draw() {
+		
 		glPushMatrix();
-		glColor3f(1, 1, 0);
+		glEnable(GL_TEXTURE_2D);		
+		GLUquadricObj* qobj;
+		qobj = gluNewQuadric();
+		glColor3f(1, 1, 1);
 		glTranslated(pos.x, pos.y, pos.z);
-		glutSolidSphere(.3,20,20);
+		glRotated(90, 0, 1, 0);
+		//glScaled(.2,1,1);
+		glBindTexture(GL_TEXTURE_2D, tex.texture[0]);
+		gluQuadricTexture(qobj, true);
+		gluQuadricNormals(qobj, GL_SMOOTH);
+		gluDisk(qobj, .1, .3, 20, 20);
+		//gluSphere(qobj, .3, 20, 20);
+		gluDeleteQuadric(qobj);
+
 		glPopMatrix();
+
 	}
 
 	void pickUp() {
@@ -754,12 +805,13 @@ public:
 	}
 };
 
-Shot shot;
+Shot shot1, shot2;
 Door door = Door(Vector(-19,0,0));
-Coin coin1 = Vector(15, 2, -15), coin2 = Vector(10,2,18);
+Coin coin1 = Coin(Vector(15, 2, -15),silverTex), coin2 = Coin(Vector(10,2,18),silverTex);
 void playerUpdate(int x) {
 	player.update();
-	shot.move();
+	shot1.move();
+	shot2.move();
 	glutTimerFunc(20, playerUpdate, 0);
 }
 
@@ -781,6 +833,7 @@ void LoadAssets()
 	model_display.Load("Models/display/scifi_display_3DS.3DS");
 	model_terror.Load("Models/torremoba/torremoba3ds.3DS");
 	model_1.Load("Models/ironman/Homem de ferro Edvaldo Costa Cordeiro.3DS");
+	model_vending.Load("Models/Bitcoin_metal_coin.3ds");
 	//model_2.Load("Models/respawn/respawntool.3DS");
 	//model_3.Load("Models/wall/wall.3DS");
 	//model_4.Load("Models//	.3DS");
@@ -790,6 +843,8 @@ void LoadAssets()
 	wallTex.Load("Textures/wall.bmp");
 	boarderWall.Load("Textures/wall7.bmp");
 	doorTex.Load("Textures/door.bmp");
+	goldTex.Load("Textures/gold.bmp");
+	silverTex.Load("Textures/silver.bmp");
 	loadBMP(&tex, "Textures/blu-sky-3.bmp", true);
 }
 
@@ -871,11 +926,11 @@ void Keyboard(unsigned char key, int x, int y) {
 		//player.camera.moveX(-d);
 		break;
 	case 'q':
-		shot = Shot(gunVector, player.camera.At - gunVector, 0);
+		shot1 = Shot(gunVector, player.camera.At - gunVector, 0);
 		break;
 	case 'e':
 		//player.camera.moveZ(-d);
-		shot = Shot(gunVector, player.camera.At - gunVector, 1);
+		shot2 = Shot(gunVector, player.camera.At - gunVector, 1);
 		break;
 	case '1':
 		player.firstPerson();
@@ -1003,6 +1058,20 @@ void mouseMove(int x, int y) {
 
 }
 
+void mousePress(int button, int state, int x, int y) {
+	Vector gunVector = Vector(player.x - 0.5 * sin(DEG2RAD(player.r)), 2, player.z - .5 * cos(DEG2RAD(player.r)));
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		shot1 = Shot(gunVector, player.camera.At - gunVector, 0);
+
+	}
+	if (button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN) {
+	shot2 = Shot(gunVector, player.camera.At - gunVector, 1);
+
+	}
+	//glutPostRedisplay();
+}
+
+
 //=======================================================================
 // Render Ground Function
 //=======================================================================
@@ -1082,7 +1151,8 @@ void myDisplay(void)
 	drawTargets();
 	wall.draw();
 	player.draw();
-	shot.draw();
+	shot1.draw();
+	shot2.draw();
 	door.draw();
 	coin1.draw();
 	coin1.pickUp();
@@ -1111,26 +1181,54 @@ void myDisplay(void)
 			(*i).draw();
 		}
 	}
-	//drawShot(0,0,0);
 
 
+	glPushMatrix();
+	glTranslated(25,1, 25);
+	glScaled(.1,.1,.1);
+	glColor3f(.5,.5,.5);
+	model_vending.Draw();
+	glPopMatrix();
 	glutSwapBuffers();
 }
 
 void setupLights() {
-	GLfloat ambient[] = { 0.7f, 0.7f, 0.7, 1.0f };
-	GLfloat diffuse[] = { 0.6f, 0.6f, 0.6, 1.0f };
-	GLfloat specular[] = { 1.0f, 1.0f, 1.0, 1.0f };
-	GLfloat shininess[] = { 50 };
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
+	GLfloat ambient[] = { 0.7f, 0.7f, 0.7, 0.5f };
+	GLfloat diffuse[] = { 0.6f, 0.6f, 0.6, .5f };
+	//GLfloat specular[] = { .5f, .5f, .5, .5f };
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse);
-	glMaterialfv(GL_FRONT, GL_SPECULAR, specular);
-	glMaterialfv(GL_FRONT, GL_SHININESS, shininess);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
+	//glMaterialfv(GL_FRONT, GL_SPECULAR, specular);
+	glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 30.0);
+	glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 90.0);
+	GLfloat lightPosition[] = { 10.0f, 0.0f, 0.0f, 0.0f };
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	GLfloat l0Direction[] = { -1.0,0.0, 0.0 };
+	glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, l0Direction);
 
-	GLfloat lightIntensity[] = { 0.7f, 0.7f, 1, 1.0f };
-	GLfloat lightPosition[] = { -7.0f, 6.0f, 3.0f, 0.0f };
-	glLightfv(GL_LIGHT0, GL_POSITION, lightIntensity);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightIntensity);
+	GLfloat l1Diffuse[] = { 1.0f, 0.0f, 0.0f, 1.0f };
+	GLfloat l1Spec[] = { 1.0f, 1.0f, 0.0f, 1.0f };
+	GLfloat l1Ambient[] = { 1.f, 0.0f, 0.0f, 1.0f };
+	GLfloat l1Position[] = { player.portal1.pos.x,20.0f, player.portal1.pos.z, true};
+	GLfloat l1Direction[] = { 0.0, -1.0, 0.0 };
+	glLightfv(GL_LIGHT1, GL_DIFFUSE, l1Diffuse);
+	glLightfv(GL_LIGHT1, GL_AMBIENT, l1Ambient);
+	glLightfv(GL_LIGHT1, GL_POSITION, l1Position);
+	glLightf(GL_LIGHT1, GL_SPOT_CUTOFF, 30.0);
+	glLightf(GL_LIGHT1, GL_SPOT_EXPONENT, 90.0);
+	glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, l1Direction);
+
+	GLfloat l2Diffuse[] = { 0.0f, 0.0f, 1.0f, 1.0f };
+	GLfloat l2Spec[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	GLfloat l2Ambient[] = { 0.f, 0.0f, 1.0f, 1.0f };
+	GLfloat l2Position[] = { player.portal2.pos.x,20.0f, player.portal2.pos.z, true };
+	GLfloat l2Direction[] = { 0.0, -1.0, 0.0 };
+	glLightfv(GL_LIGHT2, GL_DIFFUSE, l2Diffuse);
+	glLightfv(GL_LIGHT2, GL_AMBIENT, l2Ambient);
+	glLightfv(GL_LIGHT2, GL_POSITION, l2Position);
+	glLightf(GL_LIGHT2, GL_SPOT_CUTOFF, 30.0);
+	glLightf(GL_LIGHT2, GL_SPOT_EXPONENT, 90.0);
+	glLightfv(GL_LIGHT2, GL_SPOT_DIRECTION, l2Direction);
 }
 void setupCamera() {
 	glMatrixMode(GL_PROJECTION);
@@ -1171,10 +1269,10 @@ void setUpFirstLevel() {
 
 
 
-	portals.push_back(Vector(0, 3, 0));
-	portals.push_back(Vector(5, 3, 5));
-	portals.push_back(Vector(15, 5, -15));
-	portals.push_back(Vector(-15, 5, 0));
+	portals.push_back(Vector(0, 4, 0));
+	portals.push_back(Vector(5, 4, 5));
+	portals.push_back(Vector(15, 4, -15));
+	portals.push_back(Vector(-15, 4, 0));
 
 	//firstLevelWalls.push_back(Wall(0, 0, 0, 5, 5, 8, 1, wallTex));
 	gameReady = true;
@@ -1213,9 +1311,12 @@ void main(int argc, char** argv)
 	glutKeyboardFunc(Keyboard);
 	glutKeyboardUpFunc(keyUp);
 	glutSpecialFunc(Special);
+	glutMouseFunc(mousePress);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
+	glEnable(GL_LIGHT1);
+	glEnable(GL_LIGHT2);
 	glEnable(GL_NORMALIZE);
 	glEnable(GL_COLOR_MATERIAL);
 
