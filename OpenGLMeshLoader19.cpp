@@ -984,10 +984,11 @@ public:
 
 	void isPushed() {
 		if (getDistanceFromCenter(player.x, 0, player.z, pos) < square(r))
+		{
 			state = 1;
-		//win = true;
-		sndPlaySound(TEXT("win.wav"), SND_ASYNC);
-
+			win = true;
+			sndPlaySound(TEXT("win.wav"), SND_ASYNC);
+		}
 	}
 
 };
@@ -1081,7 +1082,7 @@ public:
 		}
 
 
-		buzzer.isPushed();
+		if(!win) buzzer.isPushed();
 		cout << buzzer.state << endl;
 	}
 
@@ -1319,9 +1320,9 @@ void InitMaterial()
 // OpengGL Configuration Function
 //=======================================================================
 void setUpSecondLevel() {
-	player.x = -15;
-	player.z = 0;
-	player.r = 180;
+	//player.x = -15;
+	//player.z = 0;
+	//player.r = 180;
 	player.portal1.update(-15, 0, 0);
 	player.portal2.update(-5, 0, 10);
 	coin1.pos = Vector(13, 3, 10);
@@ -1670,7 +1671,7 @@ void myDisplay(void)
 	}
 
 	drawElevator();
-	if (!level1Passed) {
+	if (!level1Passed && level != 2) {
 		if (abs(player.x + 18) < 2 && abs(player.z - 17) < 2) {
 			level1Passed = true;
 			glutTimerFunc(0, doorSlideUp, 0);
