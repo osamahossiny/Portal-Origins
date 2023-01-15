@@ -49,7 +49,8 @@ bool gameReady = false;
 int level = 1;
 GLuint tex;
 char title[] = "3D Model Loader Sample";
-int coins = 0;
+int silverCoins = 0;
+int goldCoins = 0;
 bool hasRed = false;
 bool hasBlue = false;
 bool win = false;
@@ -79,7 +80,9 @@ Model_3DS model_key;
 
 // Textures
 GLTexture tex_ground;
+GLTexture leve12Ground;
 GLTexture wallTex;
+GLTexture level2Wall;
 GLTexture boarderWall;
 GLTexture doorTex;
 GLTexture goldTex;
@@ -101,6 +104,15 @@ void drawCylinder(GLdouble r, GLdouble h) {
 	GLUquadricObj* quad;
 	quad = gluNewQuadric();
 	gluCylinder(quad, r / 5.0, r / 5.0, h, 10, 10);
+	glPopMatrix();
+}
+void addText(float x, float y, void* font, vector<char> vec) {//used to display text on screen
+	glPushMatrix();
+	glRasterPos2f(x, y);
+
+	for (auto i = vec.begin(); i < vec.end(); i++) {
+		glutBitmapCharacter(font, *i);
+	}
 	glPopMatrix();
 }
 
@@ -235,7 +247,7 @@ Door door = Door(Vector(-19, 0, 0));
 void doorSlideUp(int x) {
 	if (door.pos.y < 6) {
 		door.pos.y += .1;
-		glutTimerFunc(50, doorSlideUp, x);
+		glutTimerFunc(100, doorSlideUp, x);
 	}
 	else {
 		if (x == 1) {
@@ -246,7 +258,7 @@ void doorSlideUp(int x) {
 void doorSlideDown(int x) {
 	if (door.pos.y > 0) {
 		door.pos.y -= .1;
-		glutTimerFunc(50, doorSlideDown, x);
+		glutTimerFunc(100, doorSlideDown, x);
 	}
 	else if (x == 1) {
 		level = 2;
@@ -282,7 +294,7 @@ public:
 		glBindTexture(GL_TEXTURE_2D, portalTex.texture[0]);
 		gluQuadricTexture(qobj, true);
 		gluQuadricNormals(qobj, GL_SMOOTH);
-		gluCylinder(qobj,2,2,.5, 20,20 );
+		gluCylinder(qobj, 2, 2, .5, 20, 20);
 		gluDeleteQuadric(qobj);
 
 		glPopMatrix();
@@ -470,6 +482,24 @@ public:
 		glEnd();
 		glPopMatrix();
 
+		glBindTexture(GL_TEXTURE_2D, wallTex.texture[0]);
+
+		glPushMatrix();
+
+		glColor3f(1, 1, 1);
+		glBegin(GL_QUADS);
+		glNormal3f(1, 0, 0);
+		glTexCoord2f(0, 0);
+		glVertex3f(l / 2, h, w / 2);
+		glTexCoord2f(1, 0);
+		glVertex3f(l / 2, h, -w / 2);
+		glTexCoord2f(1, 1);
+		glVertex3f(-l / 2, h, -w / 2);
+		glTexCoord2f(0, 1);
+		glVertex3f(-l / 2, h, w / 2);
+		glEnd();
+		glPopMatrix();
+
 		glEnable(GL_LIGHTING);	// Enable lighting again for other entites coming throung the pipeline.
 		glColor3f(1, 1, 1);	// Set material back to white instead of grey used for the ground texture.
 		glDisable(GL_TEXTURE_2D);
@@ -488,7 +518,7 @@ public:
 	GLdouble speed = 0.2;
 	Camera camera;
 	bool left = false, right = false, front = false, back = false, isFirstPerson = true;
-	Portal portal1, portal2 ;
+	Portal portal1, portal2;
 
 	//tuple<Shot, Shot> shots;
 	Player(GLdouble _x, GLdouble _y, GLdouble _z, GLdouble _r) {
@@ -687,11 +717,11 @@ public:
 			z += vec.z;
 		}
 
-		if (x > 19) { 
-			x = 19; 
+		if (x > 19) {
+			x = 19;
 			if (isFirstPerson) firstPerson();
 			else thirdPerson();
-			
+
 		}
 
 		if (z > 19) {
@@ -736,7 +766,7 @@ public:
 					else thirdPerson();
 				}
 			}
-			
+
 		}
 		if (doorOpen && x > -20) {
 			glutTimerFunc(1000, doorSlideDown, 0);
@@ -844,7 +874,7 @@ public:
 				else {
 					player.portal2.update(a.x, a.y, a.z);
 				}
-					pos = Vector(-5, -5, -5);
+				pos = Vector(-5, -5, -5);
 				return true;
 			}
 			else if (pos.x > 20 || pos.x < -20 || pos.z>20 || pos.z < -20) {
@@ -875,7 +905,7 @@ public:
 			glPushMatrix();
 			glTranslated(pos.x, pos.y, pos.z);
 
-			glRotated(90, 0, 0, 1 );
+			glRotated(90, 0, 0, 1);
 
 			//glRotated(90,0, 0, 1);		
 
@@ -904,8 +934,13 @@ public:
 
 	void pickUp() {
 		if (getDistanceFromCenter(player.x, player.y, player.z, pos) < square(1)) {
-			pos = Vector(-5, -5, -5);
-			coins++;
+			pos = Vector(0, -100, 0);
+			if (type == 0) {
+				silverCoins++;
+			}
+			else {
+				goldCoins++;
+			}
 		}
 	}
 };
@@ -939,8 +974,8 @@ public:
 		glScaled(1, .1, 1);
 		gluSphere(qobj, 1, 20, 20);
 		glRotated(-90, 1, 0, 0);
-		glScaled(1, 1, 1);
-		gluCylinder(qobj, 1,1,.2, 20, 20);
+		glScaled(1, 1, 2);
+		gluCylinder(qobj, 1, 1, .2, 20, 20);
 
 		gluDeleteQuadric(qobj);
 
@@ -977,17 +1012,18 @@ public:
 		glPushMatrix();
 		glColor3f(1, 0, 0);
 		glTranslated(pos.x, .2, pos.z);
-		glScaled(1,.1,1);
+		glScaled(1, .1, 1);
 		glutSolidSphere(r, 20, 20);
 		glPopMatrix();
 	}
 
 	void isPushed() {
 		if (getDistanceFromCenter(player.x, 0, player.z, pos) < square(r))
+		{
 			state = 1;
-		//win = true;
-		sndPlaySound(TEXT("win.wav"), SND_ASYNC);
-
+			win = true;
+			sndPlaySound(TEXT("win.wav"), SND_ASYNC);
+		}
 	}
 
 };
@@ -1007,7 +1043,7 @@ public:
 	void draw() {
 		glDisable(GL_LIGHTING);	// Disable lighting 
 
-		
+
 		//glColor3f(0.6, 0.6, 0.6);	// Dim the ground texture a bit
 
 		glEnable(GL_TEXTURE_2D);	// Enable 2D texturing
@@ -1081,8 +1117,7 @@ public:
 		}
 
 
-		buzzer.isPushed();
-		cout << buzzer.state << endl;
+		if (!win) buzzer.isPushed();
 	}
 
 
@@ -1092,7 +1127,7 @@ public:
 PressurePlate pressurePlate = PressurePlate(Vector(0, 0, 15));
 SlidingPlatform slidingPlatform = SlidingPlatform(Vector(12.5, 0, 11.5));
 Shot shot1, shot2;
-Coin coin1 = Coin(Vector(10, 2, -15),0), coin2 = Coin(Vector(10,2,11),0);
+Coin coin1 = Coin(Vector(10, 2, -15), 0), coin2 = Coin(Vector(10, 2, 11), 0);
 
 
 
@@ -1256,6 +1291,9 @@ void LoadAssets()
 	slider.Load("Textures/slider.bmp");
 	red.Load("Textures/red.bmp");
 	portalTex.Load("Textures/portal.bmp");
+	leve12Ground.Load("Textures/wall7.bmp");
+	level2Wall.Load("Textures/wall6.bmp");
+
 
 
 	loadBMP(&tex, "Textures/blu-sky-3.bmp", true);
@@ -1319,19 +1357,20 @@ void InitMaterial()
 // OpengGL Configuration Function
 //=======================================================================
 void setUpSecondLevel() {
-	player.x = -15;
-	player.z = 0;
-	player.r = 180;
+
+
 	player.portal1.update(-15, 0, 0);
 	player.portal2.update(-5, 0, 10);
+	coin1.type = 1;
+	coin2.type = 1;
 	coin1.pos = Vector(13, 3, 10);
 	coin2.pos = Vector(15, 3, 18);
 	firstLevelWalls.clear();
 	portals.clear();
-	firstLevelWalls.push_back(Wall(-10, 0, 0, 1, 3, 40, wallTex));
+	firstLevelWalls.push_back(Wall(-10, 0, 0, 1, 3, 40, level2Wall));
 	// coin two compartment
-	firstLevelWalls.push_back(Wall(12, 0, 15, 16, 3, 1, wallTex));
-	firstLevelWalls.push_back(Wall(5, 0, 0, 1, 3, 40, wallTex));
+	firstLevelWalls.push_back(Wall(12, 0, 15, 16, 3, 1, level2Wall));
+	firstLevelWalls.push_back(Wall(5, 0, 0, 1, 3, 40, level2Wall));
 
 	portals.push_back(Vector(15, 4, 18));
 	portals.push_back(Vector(15, 4, 10));
@@ -1403,31 +1442,37 @@ void Keyboard(unsigned char key, int x, int y) {
 		player.teleport();
 		break;
 	case ']':
+		hasBlue = true;
+		hasRed = true;
 		level = 2;
 		setUpSecondLevel();
+		player.x = -15;
+		player.z = 0;
+		player.r = 180;
 		break;
 	case 'n':
 		level1Passed = true;
 		glutTimerFunc(0, doorSlideUp, 0);
 		break;
 	case 'g':
-		if (coins > 0) {
-			hasBlue = true;
-			coins--;
-			sndPlaySound(TEXT("buy.wav"), SND_ASYNC );
-			glutTimerFunc(2000, so, 0);
-		}
-		break;
-	case 'h':
-		if (coins > 0) {
-			hasRed = true;
-			coins--;
-			sndPlaySound(TEXT("buy.wav"), SND_ASYNC);
-			glutTimerFunc(2000, so, 0);
+		if (silverCoins > 0) {
+			if (!hasBlue) {
+				hasBlue = true;
+				silverCoins--;
+				sndPlaySound(TEXT("buy.wav"), SND_ASYNC);
+				glutTimerFunc(2000, so, 0);
+			}
+			else if (!hasRed) {
+				hasRed = true;
+				silverCoins--;
+				sndPlaySound(TEXT("buy.wav"), SND_ASYNC);
+				glutTimerFunc(2000, so, 0);
+			}
 		}
 		break;
 	case '.':
 		win = true;
+		sndPlaySound(TEXT("win.wav"), SND_ASYNC);
 		break;
 	}
 
@@ -1538,7 +1583,7 @@ void mousePress(int button, int state, int x, int y) {
 
 	}
 	if (hasRed && button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN) {
-	shot2 = Shot(gunVector, player.camera.At - gunVector, 1);
+		shot2 = Shot(gunVector, player.camera.At - gunVector, 1);
 
 	}
 	//glutPostRedisplay();
@@ -1556,8 +1601,8 @@ void RenderGround()
 
 	glEnable(GL_TEXTURE_2D);	// Enable 2D texturing
 
-	glBindTexture(GL_TEXTURE_2D, tex_ground.texture[0]);	// Bind the ground texture
-
+	if (level == 1) glBindTexture(GL_TEXTURE_2D, tex_ground.texture[0]);	// Bind the ground texture
+	else glBindTexture(GL_TEXTURE_2D, leve12Ground.texture[0]);
 	glPushMatrix();
 	glBegin(GL_QUADS);
 	glNormal3f(0, 1, 0);	// Set quad normal direction.
@@ -1580,16 +1625,12 @@ void RenderGround()
 //=======================================================================
 // Display Function
 //=======================================================================
-void endgame(int) {
-	exit(0);
-}
-
-
+bool ending = false;
 
 void myDisplay(void)
 {
-	if (win) {
-		win = false;
+	if (win && !ending) {
+		ending = true;
 		glutTimerFunc(5000, exit, 0);
 	}
 
@@ -1601,10 +1642,10 @@ void myDisplay(void)
 
 
 
-	GLfloat lightIntensity[] = { 0.7, 0.7, 0.7, 1.0f };
-	GLfloat lightPosition[] = { 0.0f, 100.0f, 0.0f, 0.0f };
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-	glLightfv(GL_LIGHT0, GL_AMBIENT, lightIntensity);
+	//GLfloat lightIntensity[] = { 0.7, 0.7, 0.7, 1.0f };
+	//GLfloat lightPosition[] = { 0.0f, 100.0f, 0.0f, 0.0f };
+	//glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	//glLightfv(GL_LIGHT0, GL_AMBIENT, lightIntensity);
 	//glEnable(GL_TEXTURE_2D);
 	// Draw Ground
 	RenderGround();
@@ -1651,26 +1692,12 @@ void myDisplay(void)
 	cout << " Eye " << player.camera.Eye.toString() << endl;
 	cout << " At " << player.camera.At.toString() << endl;
 
-	//model_display.Draw();
-
-	//glPushMatrix();
-	//model_terror.Draw();
-	//glPopMatrix();
-
-	glPushMatrix();
-	glTranslated(-5, 0, 0);
-	//model_2.Draw();
-	glPopMatrix();	glPushMatrix();
-	glTranslated(0, 0, 5);
-	//model_3.Draw();
-	glPopMatrix();
-
 	for (auto i = firstLevelWalls.begin(); i != firstLevelWalls.end(); i++) {
 		(*i).draw();
 	}
 
 	drawElevator();
-	if (!level1Passed) {
+	if (!level1Passed && level != 2) {
 		if (abs(player.x + 18) < 2 && abs(player.z - 17) < 2) {
 			level1Passed = true;
 			glutTimerFunc(0, doorSlideUp, 0);
@@ -1679,25 +1706,68 @@ void myDisplay(void)
 
 	if (!level1Passed && level != 2) {
 
-	glPushMatrix();
-	glTranslated(-18,1, 17);
-	glRotated(90,0,0,1);
-	glScaled(.15,.15,.15);
-	model_key.Draw();
-	glPopMatrix();
+		glPushMatrix();
+		glTranslated(-18, 1, 17);
+		glRotated(90, 0, 0, 1);
+		glScaled(.15, .15, .15);
+		model_key.Draw();
+		glPopMatrix();
+	}
+	glDisable(GL_LIGHTING);
+	glDisable(GL_TEXTURE_2D);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	//double w = glutGet(1980);
+	//double h = glutGet(1080);
+	glOrtho(0, 1920, 0, 1080, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	vector<char> message;
+	glColor3f(.5, .5, .5);
+	message.push_back(48 + silverCoins); //silver
+	for (int i = 0; i < 7; i++) {
+		message.push_back(" Silver"[i]);
 	}
 
+	addText(30, 910, GLUT_BITMAP_TIMES_ROMAN_24, message);
 
+	message.clear();
+
+	glColor3f(.8, .8, 0);
+	message.push_back(48 + goldCoins); //gold coins
+	for (int i = 0; i < 5; i++) {
+		message.push_back(" Gold"[i]);
+	}
+
+	addText(30, 970, GLUT_BITMAP_TIMES_ROMAN_24, message);
+
+	message.clear();
+	glColor3f(0, .5, 1); //level
+	for (int i = 0; i < 6; i++) {
+		message.push_back("Level "[i]);
+	}
+	message.push_back(48 + level);
+
+
+	addText(30, 1030, GLUT_BITMAP_TIMES_ROMAN_24, message);
+
+
+	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_LIGHTING);
 	glutSwapBuffers();
 }
 
 void setupLights() {
 	GLfloat ambient[] = { 0.7f, 0.7f, 0.7, 0.5f };
-	GLfloat diffuse[] = { 0.6f, 0.6f, 0.6, .5f };
+	GLfloat diffuse[] = { 0.7f, 0.7f, 0.7, .5f };
 	//GLfloat specular[] = { .5f, .5f, .5, .5f };
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
 	//glMaterialfv(GL_FRONT, GL_SPECULAR, specular);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+	//glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+
 	glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 30.0);
 	glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 90.0);
 	GLfloat lightPosition[] = { 10.0f, 0.0f, 0.0f, 0.0f };
@@ -1705,25 +1775,25 @@ void setupLights() {
 	GLfloat l0Direction[] = { -1.0,0.0, 0.0 };
 	glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, l0Direction);
 
-	if (level == 2) {
-		GLfloat ambient[] = { 0.7f, 0.7f, 0.7, 0.5f };
-		GLfloat diffuse[] = { 0.6f, 0.6f, 0.6, .5f };
-		//GLfloat specular[] = { .5f, .5f, .5, .5f };
-		glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse);
-		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
-		//glMaterialfv(GL_FRONT, GL_SPECULAR, specular);
-		glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 30.0);
-		glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 90.0);
-		GLfloat lightPosition[] = { -10.0f, 0.0f, 0.0f, 0.0f };
-		glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-		GLfloat l0Direction[] = { 1.0,0.0, 0.0 };
-		glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, l0Direction);
-	}
+	//if (level == 2) {
+	//	GLfloat ambient[] = { 0.7f, 0.7f, 0.7, 0.5f };
+	//	GLfloat diffuse[] = { 0.6f, 0.6f, 0.6, .5f };
+	//	//GLfloat specular[] = { .5f, .5f, .5, .5f };
+	//	glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse);
+	//	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
+	//	//glMaterialfv(GL_FRONT, GL_SPECULAR, specular);
+	//	glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 30.0);
+	//	glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 90.0);
+	//	GLfloat lightPosition[] = { -10.0f, 0.0f, 0.0f, 0.0f };
+	//	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	//	GLfloat l0Direction[] = { 1.0,0.0, 0.0 };
+	//	glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, l0Direction);
+	//}
 
 	GLfloat l1Diffuse[] = { 1.0f, 0.0f, 0.0f, 1.0f };
 	GLfloat l1Spec[] = { 1.0f, 1.0f, 0.0f, 1.0f };
 	GLfloat l1Ambient[] = { 1.f, 0.0f, 0.0f, 1.0f };
-	GLfloat l1Position[] = { player.portal2.pos.x,20.0f, player.portal2.pos.z, true};
+	GLfloat l1Position[] = { player.portal2.pos.x,20.0f, player.portal2.pos.z, true };
 	GLfloat l1Direction[] = { 0.0, -1.0, 0.0 };
 	glLightfv(GL_LIGHT1, GL_DIFFUSE, l1Diffuse);
 	glLightfv(GL_LIGHT1, GL_AMBIENT, l1Ambient);
@@ -1789,7 +1859,7 @@ void setUpFirstLevel() {
 	portals.push_back(Vector(5, 4, 5));
 	portals.push_back(Vector(15, 4, -15));
 	portals.push_back(Vector(-15, 4, 0));
-	portals.push_back(Vector(-15,4, 15));
+	portals.push_back(Vector(-15, 4, 15));
 
 
 	//firstLevelWalls.push_back(Wall(0, 0, 0, 5, 5, 8, 1, wallTex));
